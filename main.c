@@ -702,8 +702,10 @@ void cuimoji_ui(cui_ctx *ui) {
          * y position is the chrome height (they scale with the UI size). */
         cui_rect grid_rect = cui_get_rect(ui, picker_sub_id(ui, "#grid"));
         float chrome = grid_rect.y > 20.0f ? grid_rect.y : 94.0f;
-        float grid_h = ui->vh - FOOTER_H - chrome;
-        if (grid_h < 120.0f) grid_h = 120.0f;
+        /* CUI centers the panel's 1 px border on its edge; leave one pixel
+         * inside the viewport so the bottom outline is not clipped. */
+        float grid_h = ui->vh - FOOTER_H - chrome - 1.0f;
+        if (grid_h < 40.0f) grid_h = 40.0f;
         footer_y = ui->vh - FOOTER_H;
         footer_h = FOOTER_H;
         float pad_bottom = (footer_h - 28.0f) * 0.5f;
