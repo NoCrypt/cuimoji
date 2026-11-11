@@ -84,8 +84,7 @@ int cuimoji_run_sdl(void) {
     int pix_w = 0, pix_h = 0;
     SDL_Texture *tex = NULL;
     int tex_w = 0, tex_h = 0;
-    int seen_w = 0, seen_h = 0;
-    Uint32 last_resize = 0;
+    Uint32 last_draw_ms = 0;
     bool have_frame = false;
 
     uint64_t freq = SDL_GetPerformanceFrequency();
@@ -100,18 +99,18 @@ int cuimoji_run_sdl(void) {
         if (ww <= 0 || wh <= 0 || pw <= 0 || ph <= 0) { SDL_Delay(8); continue; }
 
         Uint32 now_ms = SDL_GetTicks();
-        if (pw != seen_w || ph != seen_h) {
-            seen_w = pw;
-            seen_h = ph;
-            last_resize = now_ms;
-        }
-        /* While the window keeps changing size, present nothing at all: the
-         * compositor keeps the last committed buffer and scales it. Committing
-         * intermediate sizes is what flashed. Re-render once the size has been
-         * stable for 150 ms. */
-        if (have_frame && (pw != tex_w || ph != tex_h) &&
-            (Uint32)(now_ms - last_resize) < 150) {
+        bool size_diff = (pw != tex_w || ph != tex_h);
+        /* While resizing, draw at up to ~30 fps so the content follows the
+         * drag; between those frames the compositor scales the last buffer.
+         * The texture is rebuilt for each new size, which is cheap here. */
+        if (have_frame && size_diff && (Uint32)(now_ms - last_draw_ms) < 33) {
             last = SDL_GetPerformanceCounter();
+            SDL_Delay(2);
+            continue;
+        }
+        /* Nothing changed and no animation: no need to redraw. */
+        if (have_frame && !size_diff && !cui_needs_redraw(ui)) {
+            SDL_Delay(8);
             continue;
         }
 
@@ -157,6 +156,7 @@ int cuimoji_run_sdl(void) {
         SDL_RenderCopy(ren, tex, NULL, NULL);
         SDL_RenderPresent(ren);
         have_frame = true;
+        last_draw_ms = SDL_GetTicks();
     }
 
     SDL_StopTextInput();
