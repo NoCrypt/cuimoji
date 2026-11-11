@@ -1,5 +1,5 @@
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..277387d 100644
+index c15f341..a210239 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -285,6 +285,15 @@ index c15f341..277387d 100644
  
  typedef struct { int start, count, kind; } cui__em_section;   /* kind: 0 recent, 1..9 a group, 10 results */
  
+@@ -1062,7 +1240,7 @@ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
+     cui_rect r = n->rect;
+     float side = 18;
+     cui_rect d = { r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side };
+-    if (p->icon) cui_draw_icon(ui, p->s, d, side - 2, cui_alpha(CUI_C(ui, FOREGROUND), p->alpha * 0.9f));
++    if (p->icon) cui_draw_icon(ui, p->s, d, side, cui_alpha(CUI_C(ui, FOREGROUND), p->alpha * 0.9f));
+     else cui__em_draw(ui, p->s, p->len, d, p->alpha, NULL);
+     if (p->active) cui_draw_rect(ui, (cui_rect){ r.x + 6, r.y + r.h - 2, r.w - 12, 2 }, CUI_CORNERS(1), p->bar);
+ }
 @@ -1107,6 +1285,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
                  const cui__em_rec *rec = &e->recs[i];
                  const char *name = e->data + rec->name;
