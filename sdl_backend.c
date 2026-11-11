@@ -146,6 +146,8 @@ int cuimoji_run_sdl(void) {
         return 1;
     }
     SDL_SetWindowBordered(sdl_win, SDL_FALSE);
+    SDL_SetWindowMinimumSize(sdl_win, CUIMOJI_MIN_W, CUIMOJI_MIN_H);
+    SDL_SetWindowMaximumSize(sdl_win, CUIMOJI_MAX_W, CUIMOJI_MAX_H);
 
     SDL_SysWMinfo wm;
     SDL_VERSION(&wm.version);

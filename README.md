@@ -24,7 +24,7 @@ popover, three renderers, and a fast auto-paste path.
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
     `F2` cycles sets.
   - **Emoji size** — scrub field (drag sideways, click to type), step 2
-    (16-128 px).
+    (24-128 px).
   - **UI size** — number field, step 5 (80-150 %).
   - **Paste delay (fallback)** — number field, step 10 ms (0-500); the wait
     used when niri cannot be asked for the focused window.

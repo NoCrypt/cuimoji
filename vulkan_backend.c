@@ -36,6 +36,8 @@ int cuimoji_run_vulkan(void) {
         SDL_Quit();
         return 1;
     }
+    SDL_SetWindowMinimumSize(vk_win, CUIMOJI_MIN_W, CUIMOJI_MIN_H);
+    SDL_SetWindowMaximumSize(vk_win, CUIMOJI_MAX_W, CUIMOJI_MAX_H);
 
     cui_vk *vk = cui_vk_create(vk_win);
     if (!vk) {

@@ -324,7 +324,7 @@ void cuimoji_state_load(void) {
             theme_mode = strcmp(line + 6, "light") == 0 ? 1 : 0;
         } else if (strncmp(line, "emoji_size=", 11) == 0) {
             emoji_size = atoi(line + 11);
-            if (emoji_size < 16) emoji_size = 16;
+            if (emoji_size < 24) emoji_size = 24;
             if (emoji_size > 128) emoji_size = 128;
         } else if (strncmp(line, "ui_scale=", 9) == 0) {
             ui_scale = atoi(line + 9);
@@ -686,7 +686,7 @@ void cuimoji_ui(cui_ctx *ui) {
                             cuimoji_state_save();
                         }
                         double sz = (double)emoji_size;
-                        if (cui_number(ui, "emoji-size", &sz, 16, 128,
+                        if (cui_number(ui, "emoji-size", &sz, 24, 128,
                                        .label = "Emoji size", .step = 2, .suffix = " px",
                                        .width = CUI_FILL)) {
                             emoji_size = (int)(sz + 0.5);
@@ -776,8 +776,8 @@ int main(void) {
     desc.title = "cuimoji";
     desc.width = CUIMOJI_WIN_W;
     desc.height = CUIMOJI_WIN_H;
-    desc.min_width = 240;
-    desc.min_height = 260;
+    desc.min_width = CUIMOJI_MIN_W;
+    desc.min_height = CUIMOJI_MIN_H;
     desc.fixed_size = false;
     desc.hidden = true;   /* we map it ourselves after setting WM_CLASS */
     desc.theme = theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK;
@@ -797,9 +797,11 @@ int main(void) {
         XSetClassHint(xdpy, xwin, &ch);
         XSizeHints *hints = XAllocSizeHints();
         if (hints) {
-            hints->flags = PMinSize;
-            hints->min_width = 240;
-            hints->min_height = 260;
+            hints->flags = PMinSize | PMaxSize;
+            hints->min_width = CUIMOJI_MIN_W;
+            hints->min_height = CUIMOJI_MIN_H;
+            hints->max_width = CUIMOJI_MAX_W;
+            hints->max_height = CUIMOJI_MAX_H;
             XSetWMNormalHints(xdpy, xwin, hints);
             XFree(hints);
         }
