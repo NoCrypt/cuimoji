@@ -18,11 +18,14 @@ popover, three renderers, and a fast auto-paste path.
   - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
     `F2` cycles sets.
-  - **Emoji size** — 20 to 40 px.
-  - **UI size** — Small / Default / Large.
-  - **Paste delay (fallback)** — the wait used when niri cannot be asked for
-    the focused window (0-100 ms, default 20).
+  - **Emoji size** — number field, step 2 (16-48 px).
+  - **UI size** — number field, step 5 (80-150 %).
+  - **Paste delay (fallback)** — number field, step 10 ms (0-500); the wait
+    used when niri cannot be asked for the focused window.
   - **Renderer** — Software, OpenGL, Vulkan. Applied on the next launch.
+  - **Window system** — Auto / Wayland / X11. Auto uses the Wayland-native
+    SDL2 window when a Wayland session is available, with the X11 window as
+    the fallback. Applied on the next launch.
 - **Resizable window**: the grid and the 34 px bottom bar follow the size.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no
@@ -38,9 +41,9 @@ cmake --build build -j
 ./build/cuimoji
 ```
 
-Dependencies: `libx11`, and for the Vulkan renderer `sdl2` + `vulkan-headers`
-(the option simply falls back to Software without them). CUI v1.2.0 is fetched
-by CMake.
+Dependencies: `libx11`, and for the Wayland-native window `sdl2` (the Vulkan
+renderer additionally needs `vulkan-headers`; without SDL2 the app builds the
+X11 window only). CUI v1.2.0 is fetched by CMake.
 
 CUI is patched by `patches/cui-fast-emoji.patch`: it draws up to 256 new emoji
 per frame and keeps the 1024 texture, so the grid is complete on the first

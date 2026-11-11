@@ -14,25 +14,31 @@ set(CUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cui)
 
 find_package(X11 REQUIRED)
-
-set(CUIMOJI_SOURCES main.c uinput.c)
-
-# Optional Vulkan renderer (the SDL2 loop from the CUI mosaic demo).
-set(CUIMOJI_HAVE_VULKAN OFF)
 find_package(SDL2 QUIET)
 find_package(Vulkan QUIET)
-if(SDL2_FOUND AND Vulkan_FOUND)
-    set(CUIMOJI_HAVE_VULKAN ON)
-    list(APPEND CUIMOJI_SOURCES vulkan_backend.c vulkan/cui_vulkan.c)
-    add_compile_definitions(CUIMOJI_HAVE_VULKAN=1)
-    message(STATUS "cuimoji: Vulkan renderer enabled")
+
+set(CUIMOJI_SOURCES main.c uinput.c)
+set(CUIMOJI_LIBS cui::cui X11::X11)
+
+# Wayland-native window: SDL2 (software renderer), plus Vulkan on top of it
+# when the headers are there.
+if(SDL2_FOUND)
+    list(APPEND CUIMOJI_SOURCES sdl_common.c sdl_backend.c)
+    list(APPEND CUIMOJI_LIBS SDL2::SDL2)
+    add_compile_definitions(CUIMOJI_HAVE_SDL2=1)
+    message(STATUS "cuimoji: SDL2/Wayland backend enabled")
+    if(Vulkan_FOUND)
+        list(APPEND CUIMOJI_SOURCES vulkan_backend.c vulkan/cui_vulkan.c)
+        list(APPEND CUIMOJI_LIBS Vulkan::Vulkan)
+        add_compile_definitions(CUIMOJI_HAVE_VULKAN=1)
+        message(STATUS "cuimoji: Vulkan renderer enabled")
+    else()
+        message(STATUS "cuimoji: Vulkan renderer not built (Vulkan headers needed)")
+    endif()
 else()
-    message(STATUS "cuimoji: Vulkan renderer not built (SDL2 and Vulkan headers needed)")
+    message(STATUS "cuimoji: SDL2 not found, only the X11 window is built")
 endif()
 
 add_executable(cuimoji ${CUIMOJI_SOURCES})
 target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/vulkan)
-target_link_libraries(cuimoji PRIVATE cui::cui X11::X11)
-if(CUIMOJI_HAVE_VULKAN)
-    target_link_libraries(cuimoji PRIVATE SDL2::SDL2 Vulkan::Vulkan)
-endif()
+target_link_libraries(cuimoji PRIVATE ${CUIMOJI_LIBS})

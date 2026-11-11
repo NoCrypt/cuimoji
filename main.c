@@ -52,8 +52,6 @@
 static char picker_id[32] = PICKER_ID;
 static int picker_gen;
 static bool font_pending;
-#define WINDOW_W 520
-#define WINDOW_H 720
 #define GRID_H 592
 #define FOOTER_H 34
 #define DEFAULT_FOCUS_DELAY_MS 20
@@ -68,6 +66,7 @@ static int emoji_size = 28;
 static int ui_scale = 100;
 static int paste_delay_ms = 20;   /* fallback when niri cannot be asked */
 static int theme_mode;            /* 0 dark, 1 light */
+static int platform_mode;         /* 0 auto, 1 wayland (SDL2), 2 X11 */
 static bool initial_focus_done;
 static bool debug_on;
 static int uinput_fd = -1;
@@ -226,6 +225,8 @@ static void state_dir(char *out, size_t cap) {
     }
 }
 
+cui_theme_mode cuimoji_theme(void) { return theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK; }
+
 void cuimoji_state_load(void) {
     char dir[1024], path[1200];
     state_dir(dir, sizeof dir);
@@ -249,6 +250,11 @@ void cuimoji_state_load(void) {
             paste_delay_ms = atoi(line + 12);
             if (paste_delay_ms < 0) paste_delay_ms = 0;
             if (paste_delay_ms > 500) paste_delay_ms = 500;
+        } else if (strncmp(line, "platform=", 9) == 0) {
+            line[strcspn(line, "\r\n")] = 0;
+            if (strcmp(line + 9, "wayland") == 0) platform_mode = 1;
+            else if (strcmp(line + 9, "x11") == 0) platform_mode = 2;
+            else platform_mode = 0;
         } else if (strncmp(line, "theme=", 6) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             theme_mode = strcmp(line + 6, "light") == 0 ? 1 : 0;
@@ -277,9 +283,12 @@ void cuimoji_state_save(void) {
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
     FILE *f = fopen(tmp, "w");
     if (!f) return;
-    fprintf(f, "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\npaste_delay=%d\ntheme=%s\nrenderer=%s\n",
+    fprintf(f,
+            "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\npaste_delay=%d\ntheme=%s\n"
+            "platform=%s\nrenderer=%s\n",
             tone, recent, selected_font, emoji_size, ui_scale, paste_delay_ms,
             theme_mode ? "light" : "dark",
+            platform_mode == 1 ? "wayland" : platform_mode == 2 ? "x11" : "auto",
             renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software");
     fclose(f);
     rename(tmp, path);
@@ -610,38 +619,39 @@ void cuimoji_ui(cui_ctx *ui) {
                             font_pending = true;
                             cuimoji_state_save();
                         }
-                        static const char *const size_items[] = { "20 px", "24 px", "28 px", "32 px", "36 px", "40 px" };
-                        static const int size_values[] = { 20, 24, 28, 32, 36, 40 };
-                        int sz = 2;
-                        for (int i = 0; i < 6; i++) if (size_values[i] == emoji_size) sz = i;
-                        if (cui_select(ui, "emoji-size", size_items, 6, &sz,
-                                       .label = "Emoji size", .width = CUI_FILL)) {
-                            emoji_size = size_values[sz];
+                        double sz = (double)emoji_size;
+                        if (cui_number(ui, "emoji-size", &sz, 16, 48,
+                                       .label = "Emoji size", .step = 2, .suffix = " px",
+                                       .width = CUI_FILL)) {
+                            emoji_size = (int)(sz + 0.5);
                             cuimoji_state_save();
                         }
-                        static const char *const ui_items[] = { "Small", "Default", "Large" };
-                        static const int ui_values[] = { 90, 100, 115 };
-                        int us = 1;
-                        for (int i = 0; i < 3; i++) if (ui_values[i] == ui_scale) us = i;
-                        if (cui_select(ui, "ui-size", ui_items, 3, &us,
-                                       .label = "UI size", .width = CUI_FILL)) {
-                            ui_scale = ui_values[us];
+                        double us = (double)ui_scale;
+                        if (cui_number(ui, "ui-size", &us, 80, 150,
+                                       .label = "UI size", .step = 5, .suffix = " %",
+                                       .width = CUI_FILL)) {
+                            ui_scale = (int)(us + 0.5);
+                            cuimoji_state_save();
+                        }
+                        double dl = (double)paste_delay_ms;
+                        if (cui_number(ui, "paste-delay", &dl, 0, 500,
+                                       .label = "Paste delay (fallback)", .step = 10,
+                                       .suffix = " ms", .width = CUI_FILL)) {
+                            paste_delay_ms = (int)(dl + 0.5);
                             cuimoji_state_save();
                         }
                         static const char *const renderers[] = { "Software", "OpenGL", "Vulkan" };
                         int ridx = renderer_mode;
-                        static const char *const delay_items[] = { "0 ms", "10 ms", "20 ms", "40 ms", "60 ms", "100 ms" };
-                        static const int delay_values[] = { 0, 10, 20, 40, 60, 100 };
-                        int dl = 2;
-                        for (int i = 0; i < 6; i++) if (delay_values[i] == paste_delay_ms) dl = i;
-                        if (cui_select(ui, "paste-delay", delay_items, 6, &dl,
-                                       .label = "Paste delay (fallback)", .width = CUI_FILL)) {
-                            paste_delay_ms = delay_values[dl];
-                            cuimoji_state_save();
-                        }
                         if (cui_select(ui, "renderer", renderers, 3, &ridx,
                                        .label = "Renderer", .width = CUI_FILL)) {
                             renderer_mode = ridx;
+                            cuimoji_state_save();
+                        }
+                        static const char *const platforms[] = { "Auto", "Wayland", "X11" };
+                        int pidx = platform_mode;
+                        if (cui_select(ui, "platform", platforms, 3, &pidx,
+                                       .label = "Window system", .width = CUI_FILL)) {
+                            platform_mode = pidx;
                             cuimoji_state_save();
                         }
                         }
@@ -658,28 +668,43 @@ int main(void) {
     cuimoji_fonts_scan();
     uinput_fd = uinput_keyboard_open("cuimoji virtual keyboard");
 
+    /* Window system: X11 (through XWayland on a Wayland session), or a
+     * Wayland-native SDL2 window. "Auto" picks Wayland when it is there. */
+    bool want_sdl = platform_mode == 1 || (platform_mode == 0 && getenv("WAYLAND_DISPLAY"));
+#ifdef CUIMOJI_HAVE_SDL2
+    if (want_sdl) {
 #ifdef CUIMOJI_HAVE_VULKAN
-    if (renderer_mode == 2) {
-        int rc = cuimoji_run_vulkan();
-        if (rc == 0) {
+        if (renderer_mode == 2) {
+            if (cuimoji_run_vulkan() == 0) {
+                uinput_keyboard_close(uinput_fd);
+                return 0;
+            }
+            fprintf(stderr, "cuimoji: Vulkan backend failed, falling back\n");
+            renderer_mode = 0;
+        }
+#else
+        if (renderer_mode == 2) {
+            fprintf(stderr, "cuimoji: this build has no Vulkan backend, using the software renderer\n");
+            renderer_mode = 0;
+        }
+#endif
+        if (cuimoji_run_sdl() == 0) {
             uinput_keyboard_close(uinput_fd);
             return 0;
         }
-        fprintf(stderr, "cuimoji: Vulkan backend failed, using the X11 window\n");
-        renderer_mode = 0;
+        fprintf(stderr, "cuimoji: SDL2/Wayland failed, using the X11 window\n");
     }
 #else
-    if (renderer_mode == 2) {
-        fprintf(stderr, "cuimoji: this build has no Vulkan backend, using the X11 window\n");
-        renderer_mode = 0;
-    }
+    if (want_sdl)
+        fprintf(stderr, "cuimoji: this build has no SDL2 backend, using the X11 window\n");
+    if (renderer_mode == 2) renderer_mode = 0;
 #endif
 
     cui_app_desc desc;
     memset(&desc, 0, sizeof desc);
     desc.title = "cuimoji";
-    desc.width = 360;
-    desc.height = 480;
+    desc.width = CUIMOJI_WIN_W;
+    desc.height = CUIMOJI_WIN_H;
     desc.min_width = 240;
     desc.min_height = 260;
     desc.fixed_size = false;
