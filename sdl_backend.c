@@ -107,14 +107,12 @@ int cuimoji_run_sdl(void) {
             seen_h = ph;
             last_resize = now_ms;
         }
-        /* While the window keeps changing size, keep showing the last frame
-         * scaled into the new size (linear), instead of reallocating and
-         * re-rendering at every intermediate size. That is what flashes. */
+        /* While the window keeps changing size, present nothing at all: the
+         * compositor keeps the last committed buffer and scales it. Committing
+         * intermediate sizes is what flashed. Re-render once the size has been
+         * stable for 150 ms. */
         if (have_frame && (pw != tex_w || ph != tex_h) &&
             (Uint32)(now_ms - last_resize) < 150) {
-            SDL_Rect dst = { 0, 0, pw, ph };
-            SDL_RenderCopy(ren, tex, NULL, &dst);
-            SDL_RenderPresent(ren);
             last = SDL_GetPerformanceCounter();
             continue;
         }
