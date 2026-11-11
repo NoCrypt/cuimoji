@@ -10,7 +10,8 @@
  *   - Ctrl+V sent from a persistent /dev/uinput keyboard (no daemon, no
  *     process spawn, no portal)
  *   - waits for the compositor to give focus back to the previous window
- *     (using niri's IPC when available) so the paste lands in the right app;
+ *     (using the compositor IPC when available) so the paste lands in the
+ *     right app;
  *     terminals get Ctrl+Shift+V
  *   - recents, skin tone and the emoji font are saved under
  *     $XDG_STATE_HOME/cuimoji
@@ -96,7 +97,7 @@ static int tone;
 static int renderer_mode;   /* 0 software, 1 OpenGL, 2 Vulkan */
 static int emoji_size = 28;
 static int ui_scale = 100;
-static int paste_delay_ms = 20;   /* fallback when niri cannot be asked */
+static int paste_delay_ms = 20;   /* fallback when the compositor cannot be asked */
 static int theme_mode;            /* 0 dark, 1 light */
 static int platform_mode;         /* 0 auto, 1 wayland (SDL2), 2 X11 */
 static bool initial_focus_done;
@@ -167,7 +168,7 @@ static double now_ms(void) {
 }
 
 static bool is_self_app(const char *id) {
-    /* niri reports the X11 WM_CLASS; CUI's default class is "CUI", the title
+    /* compositors report the X11 WM_CLASS; CUI's default class is "CUI", the title
      * is "cuimoji". Our own hint may or may not have reached XWayland by the
      * time the surface is mapped, so accept both. */
     return !id[0] || strcmp(id, "cuimoji") == 0 || strcmp(id, "CUI") == 0;
@@ -185,21 +186,23 @@ static bool is_terminal_app(const char *id) {
     return false;
 }
 
-static bool focused_app_id(char *out, size_t cap) {
+static bool json_string(const char *buf, const char *key, char *out, size_t cap) {
     out[0] = 0;
-    FILE *p = popen("niri msg --json focused-window 2>/dev/null", "r");
-    if (!p) return false;
-    char buf[4096];
-    size_t n = fread(buf, 1, sizeof buf - 1, p);
-    buf[n] = 0;
-    pclose(p);
-
-    const char *key = "\"app_id\":\"";
-    const char *s = strstr(buf, key);
+    char pat[64];
+    snprintf(pat, sizeof pat, "\"%s\"", key);
+    const char *s = strstr(buf, pat);
     if (!s) return false;
-    s += strlen(key);
-    const char *e = strchr(s, '"');
-    if (!e) return false;
+    s += strlen(pat);
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s++ != ':') return false;
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s++ != '"') return false;
+    const char *e = s;
+    while (*e && *e != '"') {
+        if (*e == '\\' && e[1]) e++;
+        e++;
+    }
+    if (*e != '"') return false;
     size_t len = (size_t)(e - s);
     if (len >= cap) len = cap - 1;
     memcpy(out, s, len);
@@ -207,12 +210,46 @@ static bool focused_app_id(char *out, size_t cap) {
     return out[0] != 0;
 }
 
+/* niri, Mango and Hyprland all export a signature when they run their IPC. */
+static bool have_focus_ipc(void) {
+    return getenv("NIRI_SOCKET") || getenv("MANGO_INSTANCE_SIGNATURE") ||
+           getenv("HYPRLAND_INSTANCE_SIGNATURE");
+}
+
+static bool focused_app_id(char *out, size_t cap) {
+    out[0] = 0;
+    const char *cmd = NULL, *key = NULL;
+    if (getenv("NIRI_SOCKET")) {
+        cmd = "niri msg --json focused-window 2>/dev/null";
+        key = "app_id";
+    } else if (getenv("MANGO_INSTANCE_SIGNATURE")) {
+        cmd = "mmsg get focusing-client 2>/dev/null";
+        key = "appid";
+    } else if (getenv("HYPRLAND_INSTANCE_SIGNATURE")) {
+        cmd = "hyprctl activewindow -j 2>/dev/null";
+        key = "class";
+    }
+    if (!cmd) return false;
+
+    FILE *p = popen(cmd, "r");
+    if (!p) return false;
+    char buf[4096];
+    size_t n = fread(buf, 1, sizeof buf - 1, p);
+    buf[n] = 0;
+    pclose(p);
+
+    if (json_string(buf, key, out, cap)) return true;
+    /* Hyprland uses initialClass for some XWayland clients. */
+    if (strcmp(key, "class") == 0) return json_string(buf, "initialClass", out, cap);
+    return false;
+}
+
 static double wait_for_focus(char *target, size_t cap, double start) {
     int delay_ms = paste_delay_ms;
     const char *env = getenv("CUIMOJI_PASTE_DELAY_MS");
     if (env && atoi(env) >= 0) delay_ms = atoi(env);
 
-    if (getenv("NIRI_SOCKET")) {
+    if (have_focus_ipc()) {
         for (int i = 0; i < 4; i++) {
             if (!focused_app_id(target, cap)) break;
             if (!is_self_app(target)) return now_ms() - start;
@@ -578,7 +615,7 @@ static void do_pick(cui_ctx *ui, const char *emoji) {
     if (cuimoji_hide_window) cuimoji_hide_window();
     double t_unmap = now_ms() - t0;
 
-    /* 3. Wait for focus to leave cuimoji; niri's IPC tells us exactly. */
+    /* 3. Wait for focus to leave cuimoji; the compositor IPC tells us exactly. */
     double focus_ms = wait_for_focus(paste_target, sizeof paste_target, t0);
     bool shift = is_terminal_app(paste_target);
 
@@ -822,7 +859,7 @@ int main(void) {
     cui_app *app = cui_app_create(&desc);
     if (!app) return 1;
 
-    /* Tell XWayland/niri who we are, so the window rule and the focus check
+    /* Tell XWayland/the compositor who we are, so the window rule and the focus check
      * have a stable app id. CUI's default is res_class "CUI". */
     xdpy = XOpenDisplay(NULL);
     if (xdpy) {

@@ -28,7 +28,7 @@ that writes Ctrl+V straight to `/dev/uinput`.
   - **Emoji size** — number field, step 2 (24–128 px).
   - **UI size** — number field, step 5 (80–150 %).
   - **Paste delay (fallback)** — number field, step 10 ms (0–500); the wait
-    used when niri cannot be asked for the focused window.
+    used when the compositor IPC cannot be queried.
   - **Renderer** — Software, OpenGL, Vulkan. Applied on the next launch.
   - **Window system** — Auto / Wayland / X11. Auto picks the Wayland-native
     SDL2 window when a Wayland session is available, with the X11 window as
@@ -91,9 +91,10 @@ on X11 or Wayland directly.
 1. The emoji goes to the clipboard: CUI's X11 selection immediately, plus
    `wl-copy` for the Wayland clipboard (Wayland apps read that one).
 2. The window is hidden so the compositor refocuses the previous window.
-3. The app asks niri (`niri msg --json focused-window`) until focus has left
-   cuimoji instead of sleeping blindly; without niri it waits the configured
-   fallback delay.
+3. The app asks the compositor until focus has left cuimoji instead of
+   sleeping blindly: `niri msg --json focused-window` on niri,
+   `mmsg get focusing-client` on Mango, and `hyprctl activewindow -j` on
+   Hyprland. Without compositor IPC it waits the configured fallback delay.
 4. Ctrl+V is sent from the uinput keyboard opened at startup, with small
    delays between key events so Qt/Electron apps (Telegram, SereinGram) pick
    it up reliably.
@@ -109,8 +110,9 @@ Resident memory is ~12 MB PSS on the Wayland window (presentation goes through
 - `/dev/uinput` needs the user in the `input` group (as with ydotool); if it
   cannot be opened, the app falls back to running `ydotool`.
 - `wl-copy` (wl-clipboard) is needed to keep the clipboard after the app exits.
-- `niri` is optional: without it the app waits a short fixed delay before
-  pasting.
+- Compositor IPC is optional: niri, Mango (`mmsg`) and Hyprland
+  (`hyprctl`) are detected automatically. Without it the app waits a short
+  fixed delay before pasting.
 - The Wayland window uses SDL2 for the surface, input, and IME, and presents
   CUI's software frame through double-buffered `wl_shm` buffers attached to
   SDL's surface. The X11 window uses CUI's own window and renderer.
