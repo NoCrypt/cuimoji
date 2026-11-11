@@ -104,13 +104,20 @@ int cuimoji_run_sdl(void) {
             pixels = n;
             pix_w = pw;
             pix_h = ph;
-            if (tex_w != pw || tex_h != ph) {
-                if (tex) SDL_DestroyTexture(tex);
-                tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, pw, ph);
-                tex_w = pw;
-                tex_h = ph;
-            }
         }
+        /* Create the new texture before dropping the old one, and keep
+         * presenting the previous frame (scaled by the compositor) while
+         * there is no texture for the current size: no blank frame. */
+        if (tex_w != pw || tex_h != ph) {
+            SDL_Texture *nt = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
+                                                SDL_TEXTUREACCESS_STREAMING, pw, ph);
+            if (!nt) { SDL_Delay(8); continue; }
+            if (tex) SDL_DestroyTexture(tex);
+            tex = nt;
+            tex_w = pw;
+            tex_h = ph;
+        }
+        if (!tex) { SDL_Delay(8); continue; }
 
         float scale = ww > 0 ? (float)pw / (float)ww : 1.0f;
         cui_set_viewport(ui, (float)ww, (float)wh, scale);
@@ -128,11 +135,10 @@ int cuimoji_run_sdl(void) {
         const cui_draw_data *dd = cui_get_draw_data(ui);
         cui_sw_render(sw, dd, pixels, pw, ph, pw * 4, CUI_SW_RGBA);
 
-        SDL_RenderClear(ren);
-        if (tex) {
-            SDL_UpdateTexture(tex, NULL, pixels, pw * 4);
-            SDL_RenderCopy(ren, tex, NULL, NULL);
-        }
+        SDL_UpdateTexture(tex, NULL, pixels, pw * 4);
+        /* The copy covers the whole drawable; clearing first only adds a
+         * dark flash between resize frames. */
+        SDL_RenderCopy(ren, tex, NULL, NULL);
         SDL_RenderPresent(ren);
     }
 
