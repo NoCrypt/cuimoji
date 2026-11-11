@@ -592,6 +592,7 @@ void cuimoji_ui(cui_ctx *ui) {
         initial_focus_done = false;
     } else if (cui_key_pressed(ui, CUI_KEY_F2) && font_count > 1) {
         font_index = (font_index + 1) % font_count;
+        snprintf(selected_font, sizeof selected_font, "%s", font_paths[font_index]);
         font_pending = true;
         cuimoji_state_save();
     }
@@ -680,6 +681,7 @@ void cuimoji_ui(cui_ctx *ui) {
                         }
                         if (cui_select(ui, "emoji-set", font_items, font_count, &font_index,
                                        .label = "Emoji set", .width = CUI_FILL)) {
+                            snprintf(selected_font, sizeof selected_font, "%s", font_paths[font_index]);
                             font_pending = true;
                             cuimoji_state_save();
                         }
