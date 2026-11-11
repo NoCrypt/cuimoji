@@ -649,10 +649,12 @@ void cuimoji_ui(cui_ctx *ui) {
                             font_pending = true;
                             cuimoji_state_save();
                         }
-                        float sz = (float)emoji_size;
-                        if (cui_scrub(ui, "Emoji size", &sz, 16, 128,
-                                      .step = 2, .suffix = " px", .width = CUI_FILL)) {
-                            emoji_size = (int)(sz + 0.5f);
+                        double sz = (double)emoji_size;
+                        if (cui_number(ui, "emoji-size", &sz, 16, 128,
+                                       .label = "Emoji size", .step = 2, .suffix = " px",
+                                       .width = CUI_FILL)) {
+                            emoji_size = (int)(sz + 0.5);
+                            ui->settle_frames = 4;   /* refill the emoji atlas */
                             cuimoji_state_save();
                         }
                         double us = (double)ui_scale;
