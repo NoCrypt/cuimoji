@@ -16,15 +16,21 @@ FetchContent_MakeAvailable(cui)
 find_package(X11 REQUIRED)
 find_package(SDL2 QUIET)
 find_package(Vulkan QUIET)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
+endif()
 
 set(CUIMOJI_SOURCES main.c uinput.c)
 set(CUIMOJI_LIBS cui::cui X11::X11)
+set(CUIMOJI_INCLUDE_DIRS "")
 
-# Wayland-native window: SDL2 (software renderer), plus Vulkan on top of it
-# when the headers are there.
-if(SDL2_FOUND)
+# Wayland-native window: SDL2 with wl_shm presentation, plus Vulkan on top of
+# it when the headers are there.
+if(SDL2_FOUND AND WAYLAND_CLIENT_FOUND)
     list(APPEND CUIMOJI_SOURCES sdl_common.c sdl_backend.c)
-    list(APPEND CUIMOJI_LIBS SDL2::SDL2)
+    list(APPEND CUIMOJI_LIBS SDL2::SDL2 ${WAYLAND_CLIENT_LIBRARIES})
+    list(APPEND CUIMOJI_INCLUDE_DIRS ${WAYLAND_CLIENT_INCLUDE_DIRS})
     add_compile_definitions(CUIMOJI_HAVE_SDL2=1)
     message(STATUS "cuimoji: SDL2/Wayland backend enabled")
     if(Vulkan_FOUND)
@@ -69,5 +75,5 @@ endif()
 
 add_executable(cuimoji ${CUIMOJI_SOURCES})
 target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
-                                           ${CMAKE_CURRENT_SOURCE_DIR}/vulkan)
+                                           ${CMAKE_CURRENT_SOURCE_DIR}/vulkan ${CUIMOJI_INCLUDE_DIRS})
 target_link_libraries(cuimoji PRIVATE ${CUIMOJI_LIBS})

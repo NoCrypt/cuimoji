@@ -50,9 +50,10 @@ cmake --build build -j
 ./build/cuimoji
 ```
 
-Dependencies: `libx11`, and for the Wayland-native window `sdl2` (the Vulkan
-renderer additionally needs `vulkan-headers`; without SDL2 the app builds the
-X11 window only). CUI v1.2.0 is fetched by CMake.
+Dependencies: `libx11`, and for the Wayland-native window `sdl2` +
+`wayland-client` (the Vulkan renderer additionally needs `vulkan-headers`;
+without SDL2/wayland-client the app builds the X11 window only). CUI v1.2.0
+is fetched by CMake.
 
 CUI is patched by `patches/cui-fast-emoji.patch`: it draws up to 256 new emoji
 per frame and keeps the 1024 texture, so the grid is complete on the first

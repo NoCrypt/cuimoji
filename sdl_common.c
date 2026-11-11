@@ -82,7 +82,7 @@ bool cuimoji_sdl_pump(cui_ctx *ui) {
             break;
         }
     }
-    return !cuimoji_quit_requested;
+    return !cuimoji_quit_requested && !cuimoji_toggle_requested;
 }
 
 #endif
