@@ -1,5 +1,5 @@
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..f9a70e7 100644
+index c15f341..575c328 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -264,7 +264,69 @@ index c15f341..f9a70e7 100644
          if (!found) return false;
      }
      return true;
-@@ -1107,6 +1275,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
+@@ -907,8 +1075,19 @@ enum { CUI__EM_GROUPS = 9, CUI__EM_SECTIONS = CUI__EM_GROUPS + 2 };   /* recent,
+ 
+ static const char *const cui__em_group_names[10] = { "Recent", "Smileys & emotion", "People & body", "Animals & nature", "Food & drink",
+                                                       "Travel & places", "Activities", "Objects", "Symbols", "Flags" };
+-static const char *const cui__em_tab_icons[10] = { NULL, "\xf0\x9f\x98\x80", "\xf0\x9f\x91\x8b", "\xf0\x9f\x90\xbb", "\xf0\x9f\x8d\x94", "\xe2\x9c\x88\xef\xb8\x8f",
+-                                                   "\xe2\x9a\xbd", "\xf0\x9f\x92\xa1", "\xf0\x9f\x94\xa3", "\xf0\x9f\x8f\x81" };
++#define CUI__EM_SOCCER "#soccer"   /* Lucide Lab icon, painted as paths */
++static const char *const cui__em_tab_icons[10] = {
++    NULL,
++    CUI_ICON_SMILE,
++    "\xee\x87\x97",   /* hand */
++    "\xee\x8f\x85",   /* bird */
++    "\xee\x99\xa5",   /* hamburger */
++    "\xee\x87\x8c",   /* building */
++    CUI__EM_SOCCER,     /* soccer-ball */
++    "\xee\x87\x8a",   /* shirt */
++    "\xee\x92\x89",   /* square-sigma */
++    CUI_ICON_FLAG,
++};
+ 
+ typedef struct { int start, count, kind; } cui__em_section;   /* kind: 0 recent, 1..9 a group, 10 results */
+ 
+@@ -1057,12 +1236,38 @@ static void cui__paint_emoji_grid(cui_ctx *ui, cui_node *n, void *data) {
+ }
+ 
+ typedef struct { const char *s; int len; float alpha; bool icon, active; cui_color bar; } cui__em_tab_paint;
++static void cui__paint_soccer_icon(cui_ctx *ui, cui_rect r, float alpha) {
++    float side = CUI_MIN(r.w, r.h);
++    float cx = r.x + r.w * 0.5f, cy = r.y + r.h * 0.5f;
++    float rad = side * 0.5f;
++    float thick = CUI_MAX(1.0f, side * 0.09f);
++    cui_color c = cui_alpha(CUI_C(ui, FOREGROUND), alpha * 0.9f);
++    cui_draw_arc(ui, (cui_vec2){cx, cy}, rad - thick * 0.5f, 0, 2 * CUI_PI, thick, c);
++    cui_vec2 p[5];
++    float pr = rad * 0.46f;
++    for (int i = 0; i < 5; i++) {
++        float a = -CUI_PI * 0.5f + (float)i * 2.0f * CUI_PI / 5.0f;
++        p[i] = (cui_vec2){cx + cosf(a) * pr, cy + sinf(a) * pr};
++    }
++    cui_draw_polyline(ui, p, 5, thick, c, true);
++    for (int i = 0; i < 5; i++) {
++        cui_vec2 mid = {(p[i].x + p[(i + 1) % 5].x) * 0.5f, (p[i].y + p[(i + 1) % 5].y) * 0.5f};
++        float dx = mid.x - cx, dy = mid.y - cy;
++        float len = sqrtf(dx * dx + dy * dy);
++        if (len <= 0) continue;
++        cui_vec2 q = {cx + dx / len * (rad - thick * 0.5f), cy + dy / len * (rad - thick * 0.5f)};
++        cui_draw_line(ui, mid, q, thick, c);
++    }
++}
++
+ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
+     cui__em_tab_paint *p = data;
+     cui_rect r = n->rect;
+     float side = 18;
+     cui_rect d = { r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side };
+-    if (p->icon) cui_draw_icon(ui, p->s, d, side - 2, cui_alpha(CUI_C(ui, FOREGROUND), p->alpha * 0.9f));
++    if (p->icon && p->s && !strcmp(p->s, CUI__EM_SOCCER))
++        cui__paint_soccer_icon(ui, d, p->alpha);
++    else if (p->icon) cui_draw_icon(ui, p->s, d, side - 2, cui_alpha(CUI_C(ui, FOREGROUND), p->alpha * 0.9f));
+     else cui__em_draw(ui, p->s, p->len, d, p->alpha, NULL);
+     if (p->active) cui_draw_rect(ui, (cui_rect){ r.x + 6, r.y + r.h - 2, r.w - 12, 2 }, CUI_CORNERS(1), p->bar);
+ }
+@@ -1107,6 +1312,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
                  const cui__em_rec *rec = &e->recs[i];
                  const char *name = e->data + rec->name;
                  bool m = cui__em_match(name, rec->name_len, st->query);
@@ -272,7 +334,24 @@ index c15f341..f9a70e7 100644
                  if (!m) continue;
                  size_t ql = strlen(st->query);
                  bool lead = ql <= rec->name_len;
-@@ -1453,7 +1622,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
+@@ -1344,6 +1550,7 @@ static void cui__em_build_top_row(cui__em_frame *f) {
+     rn->pad[0] = rn->pad[1] = rn->pad[3] = 10; rn->pad[2] = 6;
+     cui__open(ui, row);
+     if (st->tone_open) {
++        rn->justify = CUI_JUSTIFY_END;   /* keep the tone choices near the tone button */
+         for (int k = 0; k < 6; k++) {
+             cui_push_id_int(ui, k);
+             cui_id tid = cui_make_id(ui, "#tone");
+@@ -1396,7 +1603,7 @@ static void cui__em_build_tabs(cui__em_frame *f) {
+             else for (int i = 0; i < g->nsec; i++) if (g->sec[i].kind == kind) { st->target = cui__em_sec_top(g, i); st->animating = true; }
+         }
+         /* the tabs share the width, so a phone fits all ten */
+-        int b = cui__em_button(ui, tid, ti, CUI_FILL, 34, kind == 0 ? CUI_ICON_CLOCK : cui__em_tab_icons[kind], kind == 0);
++        int b = cui__em_button(ui, tid, ti, CUI_FILL, 34, kind == 0 ? CUI_ICON_CLOCK : cui__em_tab_icons[kind], true);
+         ui->nodes[b].max_w = 40;
+         if (ti.hovered) ui->nodes[b].bg = CUI_C(ui, HOVER);
+         cui__em_tab_paint *tp = ui->nodes[b].paint_data;
+@@ -1453,7 +1660,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
      cui_node *rn = &ui->nodes[row];
      rn->dir = CUI_ROW; rn->align = CUI_ALIGN_CENTER; rn->w = CUI_FILL; rn->h = CUI_PX(48); rn->gap = 10; rn->pad[1] = rn->pad[3] = 12;
      cui__open(ui, row);

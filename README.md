@@ -13,7 +13,8 @@ that writes Ctrl+V straight to `/dev/uinput`.
 
 ## Features
 
-- **Grid**: recents, nine Unicode groups, skin tones, and search by name.
+- **Grid**: recents, nine Unicode groups with Lucide tab icons, skin tones,
+  and search by name.
   Matches are substring-based and also use Emojibase's tags and shortcodes
   ("burger" and "hungry" find 🍔, "rofl" finds 😆). The data
   (`emojibase-data@18.0.0/en/compact.json`, MIT) is downloaded at configure
@@ -124,6 +125,9 @@ Resident memory is ~12 MB PSS on the Wayland window (presentation goes through
 - Compositor IPC is optional: niri, Mango (`mmsg`) and Hyprland
   (`hyprctl`) are detected automatically. Without it the app waits a short
   fixed delay before pasting.
+- `assets/lucide-cuimoji.ttf` is the Lucide subset used by the group tabs
+  (the embedded CUI icons plus the eight group glyphs); CMake copies it next
+  to the binary at build time.
 - The Wayland window uses SDL2 for the surface, input, and IME, and presents
   CUI's software frame through double-buffered `wl_shm` buffers attached to
   SDL's surface. The X11 window uses CUI's own window and renderer.

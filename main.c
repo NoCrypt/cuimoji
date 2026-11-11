@@ -744,6 +744,27 @@ void cuimoji_fonts_scan(void) {
 }
 
 void cuimoji_font_apply(cui_ctx *ui) {
+    /* The group tabs use Lucide icons beyond CUI's embedded subset. Load the
+     * merged icon font next to the executable once; if it is missing, CUI's
+     * built-in icons stay in place. */
+    static bool icon_font_loaded;
+    if (!icon_font_loaded) {
+        icon_font_loaded = true;
+        char exe[PATH_MAX];
+        ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+        if (n > 0) {
+            exe[n] = 0;
+            char *slash = strrchr(exe, '/');
+            if (slash) {
+                *slash = 0;
+                char path[PATH_MAX];
+                snprintf(path, sizeof path, "%s/lucide-cuimoji.ttf", exe);
+                cui_font icons = cui_font_load_file(ui, path);
+                if (icons >= 0) cui_font_set_role(ui, CUI_FONT_ICONS, icons);
+            }
+        }
+    }
+
     int idx = font_index >= 0 && font_index < font_count ? font_index : 0;
     snprintf(selected_font, sizeof selected_font, "%s", font_paths[idx]);
     /* Switching fonts at runtime: tear the emoji state (font, atlas, cached
@@ -772,15 +793,6 @@ static cui_id picker_sub_id(cui_ctx *ui, const char *s) {
     return id;
 }
 
-static cui_id picker_tab_id(cui_ctx *ui, int kind) {
-    cui_push_id(ui, picker_id);
-    cui_push_id_int(ui, kind);
-    cui_id id = cui_make_id(ui, "#tab");
-    cui_pop_id(ui);
-    cui_pop_id(ui);
-    return id;
-}
-
 static cui_id picker_tone_id(cui_ctx *ui, int kind) {
     cui_push_id(ui, picker_id);
     cui_push_id_int(ui, kind);
@@ -803,13 +815,9 @@ static bool picker_has_id(cui_ctx *ui, cui_id id) {
     return false;
 }
 
-/* CUI draws the picker tabs and the tone button at 18 px, which this emoji
- * font stack does not rasterize. Redraw them a bit larger on top. */
+/* CUI draws the tone button at 18 px; redraw the hands a bit larger on top.
+ * The group tabs are normal Lucide icons now, so they stay with CUI. */
 static void draw_picker_icons(cui_ctx *ui) {
-    static const char *const tab_icons[10] = {
-        NULL, "\xf0\x9f\x98\x80", "\xf0\x9f\x91\x8b", "\xf0\x9f\x90\xbb", "\xf0\x9f\x8d\x94",
-        "\xe2\x9c\x88\xef\xb8\x8f", "\xe2\x9a\xbd", "\xf0\x9f\x92\xa1", "\xf0\x9f\x94\xa3", "\xf0\x9f\x8f\x81",
-    };
     static const char *const tone_hands[6] = {
         "\xe2\x9c\x8b", "\xe2\x9c\x8b\xf0\x9f\x8f\xbb", "\xe2\x9c\x8b\xf0\x9f\x8f\xbc",
         "\xe2\x9c\x8b\xf0\x9f\x8f\xbd", "\xe2\x9c\x8b\xf0\x9f\x8f\xbe", "\xe2\x9c\x8b\xf0\x9f\x8f\xbf",
@@ -821,7 +829,6 @@ static void draw_picker_icons(cui_ctx *ui) {
     } else {
         overlay_emoji(ui, picker_sub_id(ui, "#tones"), tone_hands[tone < 0 ? 0 : tone > 5 ? 5 : tone]);
     }
-    for (int kind = 1; kind <= 9; kind++) overlay_emoji(ui, picker_tab_id(ui, kind), tab_icons[kind]);
 }
 
 /* A paint-only leaf over the picker: the icons are drawn after the picker's

@@ -79,3 +79,8 @@ target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT
 target_link_libraries(cuimoji PRIVATE ${CUIMOJI_LIBS})
 # Release builds are stripped by default (~2.8 MB -> ~950 KB).
 target_link_options(cuimoji PRIVATE $<$<CONFIG:Release>:-s>)
+# The merged Lucide subset used by the group tabs at runtime.
+add_custom_command(TARGET cuimoji POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/lucide-cuimoji.ttf"
+            "$<TARGET_FILE_DIR:cuimoji>/lucide-cuimoji.ttf")
