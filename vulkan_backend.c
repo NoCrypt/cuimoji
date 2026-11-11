@@ -38,6 +38,10 @@ int cuimoji_run_vulkan(void) {
     }
     SDL_SetWindowMinimumSize(vk_win, CUIMOJI_MIN_W, CUIMOJI_MIN_H);
     SDL_SetWindowMaximumSize(vk_win, CUIMOJI_MAX_W, CUIMOJI_MAX_H);
+    if (cuimoji_win_w && cuimoji_win_h)
+        SDL_SetWindowSize(vk_win, cuimoji_win_w, cuimoji_win_h);
+    if (cuimoji_win_pos_valid && strcmp(SDL_GetCurrentVideoDriver(), "wayland") != 0)
+        SDL_SetWindowPosition(vk_win, cuimoji_win_x, cuimoji_win_y);
 
     cui_vk *vk = cui_vk_create(vk_win);
     if (!vk) {
@@ -92,6 +96,12 @@ int cuimoji_run_vulkan(void) {
         if (!cui_vk_render(vk, dd)) cui_vk_render(vk, dd);
     }
 
+    SDL_GetWindowSize(vk_win, &cuimoji_win_w, &cuimoji_win_h);
+    if (strcmp(SDL_GetCurrentVideoDriver(), "wayland") != 0) {
+        SDL_GetWindowPosition(vk_win, &cuimoji_win_x, &cuimoji_win_y);
+        cuimoji_win_pos_valid = true;
+    }
+    cuimoji_state_save();
     cui_destroy(ui);
     cui_vk_destroy(vk);
     SDL_DestroyWindow(vk_win);

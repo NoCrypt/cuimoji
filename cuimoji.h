@@ -19,6 +19,11 @@ extern bool cuimoji_quit_requested;
 extern volatile sig_atomic_t cuimoji_toggle_requested;
 extern void (*cuimoji_hide_window)(void);
 
+/* Last window geometry, persisted in the state file. Width/height are 0 when
+ * unset; the position is only meaningful on X11 (Wayland decides placement). */
+extern int cuimoji_win_w, cuimoji_win_h, cuimoji_win_x, cuimoji_win_y;
+extern bool cuimoji_win_pos_valid;
+
 void cuimoji_state_load(void);
 void cuimoji_state_save(void);
 void cuimoji_fonts_scan(void);

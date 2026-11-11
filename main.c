@@ -111,6 +111,8 @@ static float footer_h = 34;
 bool cuimoji_quit_requested;
 volatile sig_atomic_t cuimoji_toggle_requested;
 void (*cuimoji_hide_window)(void);
+int cuimoji_win_w, cuimoji_win_h, cuimoji_win_x, cuimoji_win_y;
+bool cuimoji_win_pos_valid;
 
 static void sig_toggle(int sig) {
     (void)sig;
@@ -335,12 +337,42 @@ void cuimoji_state_load(void) {
             if (strcmp(line + 9, "opengl") == 0) renderer_mode = 1;
             else if (strcmp(line + 9, "vulkan") == 0) renderer_mode = 2;
             else renderer_mode = 0;
+        } else if (strncmp(line, "win_w=", 6) == 0) {
+            cuimoji_win_w = atoi(line + 6);
+            if (cuimoji_win_w < CUIMOJI_MIN_W || cuimoji_win_w > CUIMOJI_MAX_W) cuimoji_win_w = 0;
+        } else if (strncmp(line, "win_h=", 6) == 0) {
+            cuimoji_win_h = atoi(line + 6);
+            if (cuimoji_win_h < CUIMOJI_MIN_H || cuimoji_win_h > CUIMOJI_MAX_H) cuimoji_win_h = 0;
+        } else if (strncmp(line, "win_pos=", 8) == 0) {
+            int wx, wy;
+            if (sscanf(line + 8, "%d,%d", &wx, &wy) == 2) {
+                cuimoji_win_x = wx;
+                cuimoji_win_y = wy;
+                cuimoji_win_pos_valid = true;
+            }
         }
     }
+    if (!cuimoji_win_w || !cuimoji_win_h) cuimoji_win_w = cuimoji_win_h = 0;
     fclose(f);
 }
 
+static void capture_x11_geometry(void) {
+    if (!xdpy || !xwin) return;
+    XWindowAttributes wa;
+    Window child;
+    int rx = 0, ry = 0;
+    if (!XGetWindowAttributes(xdpy, xwin, &wa)) return;
+    cuimoji_win_w = wa.width;
+    cuimoji_win_h = wa.height;
+    if (XTranslateCoordinates(xdpy, xwin, DefaultRootWindow(xdpy), 0, 0, &rx, &ry, &child)) {
+        cuimoji_win_x = rx;
+        cuimoji_win_y = ry;
+        cuimoji_win_pos_valid = true;
+    }
+}
+
 void cuimoji_state_save(void) {
+    capture_x11_geometry();
     char dir[1024], path[1200], tmp[1300];
     state_dir(dir, sizeof dir);
     snprintf(path, sizeof path, "%s/state", dir);
@@ -354,6 +386,10 @@ void cuimoji_state_save(void) {
             theme_mode ? "light" : "dark",
             platform_mode == 1 ? "wayland" : platform_mode == 2 ? "x11" : "auto",
             renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software");
+    if (cuimoji_win_w && cuimoji_win_h)
+        fprintf(f, "win_w=%d\nwin_h=%d\n", cuimoji_win_w, cuimoji_win_h);
+    if (cuimoji_win_pos_valid)
+        fprintf(f, "win_pos=%d,%d\n", cuimoji_win_x, cuimoji_win_y);
     fclose(f);
     rename(tmp, path);
 }
@@ -774,8 +810,8 @@ int main(void) {
     cui_app_desc desc;
     memset(&desc, 0, sizeof desc);
     desc.title = "cuimoji";
-    desc.width = CUIMOJI_WIN_W;
-    desc.height = CUIMOJI_WIN_H;
+    desc.width = cuimoji_win_w ? cuimoji_win_w : CUIMOJI_WIN_W;
+    desc.height = cuimoji_win_h ? cuimoji_win_h : CUIMOJI_WIN_H;
     desc.min_width = CUIMOJI_MIN_W;
     desc.min_height = CUIMOJI_MIN_H;
     desc.fixed_size = false;
@@ -805,6 +841,7 @@ int main(void) {
             XSetWMNormalHints(xdpy, xwin, hints);
             XFree(hints);
         }
+        if (cuimoji_win_pos_valid) XMoveWindow(xdpy, xwin, cuimoji_win_x, cuimoji_win_y);
         XMapRaised(xdpy, xwin);
         XFlush(xdpy);
     }

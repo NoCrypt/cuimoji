@@ -148,6 +148,10 @@ int cuimoji_run_sdl(void) {
     SDL_SetWindowBordered(sdl_win, SDL_FALSE);
     SDL_SetWindowMinimumSize(sdl_win, CUIMOJI_MIN_W, CUIMOJI_MIN_H);
     SDL_SetWindowMaximumSize(sdl_win, CUIMOJI_MAX_W, CUIMOJI_MAX_H);
+    if (cuimoji_win_w && cuimoji_win_h)
+        SDL_SetWindowSize(sdl_win, cuimoji_win_w, cuimoji_win_h);
+    if (cuimoji_win_pos_valid && strcmp(SDL_GetCurrentVideoDriver(), "wayland") != 0)
+        SDL_SetWindowPosition(sdl_win, cuimoji_win_x, cuimoji_win_y);
 
     SDL_SysWMinfo wm;
     SDL_VERSION(&wm.version);
@@ -265,6 +269,12 @@ int cuimoji_run_sdl(void) {
     }
 
     SDL_StopTextInput();
+    SDL_GetWindowSize(sdl_win, &cuimoji_win_w, &cuimoji_win_h);
+    if (strcmp(SDL_GetCurrentVideoDriver(), "wayland") != 0) {
+        SDL_GetWindowPosition(sdl_win, &cuimoji_win_x, &cuimoji_win_y);
+        cuimoji_win_pos_valid = true;
+    }
+    cuimoji_state_save();
     for (int i = 0; i < NBUF; i++) buf_drop(&bufs[i]);
     wl_registry_destroy(reg);
     cui_destroy(ui);
