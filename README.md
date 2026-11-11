@@ -2,6 +2,8 @@
 
 A small emoji picker for Linux with a native
 [CUI](https://github.com/yappologistic/CUI) interface and fast auto-paste.
+It opens in about 40 ms, uses ~12 MB PSS on Wayland (~8–11 MB on X11), and is a
+single process — no daemon, portal, or D-Bus service.
 
 The picker is CUI's searchable emoji grid; cuimoji adds the desktop glue: a
 settings popover, window-backend choices, remembered geometry, and a paste path
@@ -39,6 +41,9 @@ that writes Ctrl+V straight to `/dev/uinput`.
   240×240 to 770×770.
 - **Remembered geometry**: window size is restored on both backends; position
   is restored on X11 (Wayland compositors decide placement).
+- **Lean and instant**: ~40 ms from launch to a visible window and ~12 MB PSS
+  on Wayland (~8–11 MB on X11). No background process: the picker itself is
+  the only thing running.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   from a persistent `/dev/uinput` keyboard. No daemon, no portal, no D-Bus
   round trip. Terminals get Ctrl+Shift+V.
