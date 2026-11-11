@@ -1,8 +1,8 @@
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..7725499 100644
+index c15f341..f9a70e7 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
-@@ -15,7 +15,7 @@
+@@ -15,12 +15,14 @@
  #define CUI__EM_ATLAS_MAX 1024
  #define CUI__EM_IDLE 600   /* frames without an emoji before the texture is let go */
  #define CUI__EM_SLOTS_MAX 1024
@@ -11,7 +11,219 @@ index c15f341..7725499 100644
  
  typedef struct { uint32_t key; uint16_t px; uint8_t state; bool mono; uint64_t used; } cui__em_slot;   /* state: 0 empty, 1 drawn, 2 missing */
  
-@@ -705,7 +705,7 @@ static int cui__em_get_slot(cui_ctx *ui, cui__emoji *e, const char *utf8, int le
+ typedef struct { uint32_t text, name; uint8_t len, name_len, group, version; bool tone; } cui__em_rec;
+ 
++typedef struct { uint32_t hash, off; uint16_t gid, used; } cui__em_post_slot;
++
+ typedef struct cui__emoji {
+     /* the font */
+     unsigned char *mem; size_t size; bool owned;
+@@ -28,6 +30,8 @@ typedef struct cui__emoji {
+     uint32_t base;                          /* the font inside a collection */
+     uint8_t *cmap; uint32_t cmap_len, cmap_sub; int cmap_fmt;
+     uint8_t *gsub; uint32_t gsub_len;
++    uint8_t *post; uint32_t post_len;       /* Apple: names carry the tone variants */
++    cui__em_post_slot *post_map; uint32_t post_map_n;
+     uint8_t *cblc; uint32_t cblc_len, cbdt;
+     uint32_t sbix, sbix_strike[16]; uint16_t sbix_ppem[16]; int sbix_n;
+     uint8_t *colr, *cpal; uint32_t colr_len, cpal_len;
+@@ -75,12 +79,52 @@ static uint8_t *cui__em_table(cui_ctx *ui, cui__emoji *e, uint32_t off, uint32_t
+     return t;
+ }
+ 
++/* Apple Color Emoji has no GSUB: its toned variants are morx ligatures whose
++ * post names look like u1F44D.1 or u1F469_u2695.2. Build a name -> glyph map
++ * so the normal sequence lookup can fall back to those glyphs. */
++static void cui__em_post_build(cui_ctx *ui, cui__emoji *e) {
++    if (!e->post || e->post_len < 34) return;
++    const uint8_t *t = e->post;
++    uint32_t L = e->post_len;
++    if (CUI__T32(t, L, 0) != 0x00020000) return;
++    int ng = (int)CUI__T16(t, L, 32);
++    if (ng <= 0) return;
++    const uint8_t *p = t + 34 + (size_t)ng * 2;
++    if (p > t + L) return;
++    uint32_t cap = 16;
++    while (cap < (uint32_t)ng * 2) cap <<= 1;
++    cui__em_post_slot *map = cui__alloc(ui, sizeof *map * cap);
++    if (!map) return;
++    memset(map, 0, sizeof *map * cap);
++    for (int gid = 0; gid < ng; gid++) {
++        uint32_t off = 34 + (uint32_t)gid * 2;
++        if (off + 2 > L) break;
++        if (CUI__T16(t, L, off) < 258) continue;
++        if (p >= t + L) break;
++        uint8_t len = *p;
++        if (p + 1 + len > t + L) break;
++        uint32_t h = 2166136261u;
++        for (int i = 0; i < len; i++) h = (h ^ p[1 + i]) * 16777619u;
++        uint32_t slot = h & (cap - 1);
++        while (map[slot].used) slot = (slot + 1) & (cap - 1);
++        map[slot].used = 1;
++        map[slot].hash = h;
++        map[slot].off = (uint32_t)(p - t);
++        map[slot].gid = (uint16_t)gid;
++        p += 1 + len;
++    }
++    e->post_map = map;
++    e->post_map_n = cap;
++}
++
+ static void cui__em_close_font(cui_ctx *ui, cui__emoji *e) {
+     cui__free(ui, e->cmap); cui__free(ui, e->gsub); cui__free(ui, e->cblc); cui__free(ui, e->colr); cui__free(ui, e->cpal);
++    cui__free(ui, e->post); cui__free(ui, e->post_map);
+     cui__free(ui, e->tt);
+     if (e->owned) cui__free(ui, e->mem);
+     if (e->file) fclose(e->file);
+-    e->cmap = e->gsub = e->cblc = e->colr = e->cpal = NULL; e->tt = NULL; e->mem = NULL; e->file = NULL;
++    e->cmap = e->gsub = e->cblc = e->colr = e->cpal = NULL; e->post = NULL; e->post_map = NULL; e->post_map_n = 0;
++    e->tt = NULL; e->mem = NULL; e->file = NULL;
+     e->owned = e->loaded = e->mono_font = false; e->sbix_n = 0; e->sbix = e->cbdt = 0; e->size = 0;
+     for (int i = 0; i < e->nslots; i++) e->slots[i].state = 0;   /* drawn with the old font */
+     e->avail_font = false;
+@@ -136,12 +180,14 @@ static bool cui__em_open(cui_ctx *ui, cui__emoji *e) {
+     uint8_t dir[200 * 16];
+     if (!cui__em_read(e, e->base + 12, dir, (uint32_t)n * 16)) return false;
+     uint32_t cmap = 0, cmap_l = 0, gsub = 0, gsub_l = 0, cblc = 0, cblc_l = 0, colr = 0, colr_l = 0, cpal = 0, cpal_l = 0, maxp = 0;
++    uint32_t post = 0, post_l = 0;
+     bool glyf = false, cff = false;
+     for (int i = 0; i < n; i++) {
+         const uint8_t *r = dir + i * 16;
+         uint32_t off = cui__be32(r + 8), len = cui__be32(r + 12);
+         if (!memcmp(r, "cmap", 4)) { cmap = off; cmap_l = len; }
+         else if (!memcmp(r, "GSUB", 4)) { gsub = off; gsub_l = len; }
++        else if (!memcmp(r, "post", 4)) { post = off; post_l = len; }
+         else if (!memcmp(r, "CBLC", 4)) { cblc = off; cblc_l = len; }
+         else if (!memcmp(r, "CBDT", 4)) e->cbdt = off;
+         else if (!memcmp(r, "sbix", 4)) e->sbix = off;
+@@ -169,6 +215,13 @@ static bool cui__em_open(cui_ctx *ui, cui__emoji *e) {
+         }
+     if (!e->cmap_fmt) return false;
+     if (gsub) { e->gsub = cui__em_table(ui, e, gsub, gsub_l); e->gsub_len = e->gsub ? gsub_l : 0; }
++    if (post && !e->gsub) {
++        /* Apple AAT fonts only: their tone variants are named post glyphs.
++         * Fonts with GSUB ligatures (Noto) do not need the extra table. */
++        e->post = cui__em_table(ui, e, post, post_l);
++        e->post_len = e->post ? post_l : 0;
++        if (e->post) cui__em_post_build(ui, e);
++    }
+     if (cblc && e->cbdt) { e->cblc = cui__em_table(ui, e, cblc, cblc_l); e->cblc_len = e->cblc ? cblc_l : 0; }
+     if (e->sbix && e->num_glyphs) {
+         uint8_t sh[8];
+@@ -387,6 +440,103 @@ static int cui__utf8_cps(const char *s, int len, uint32_t *cps, int cap) {
+     return n;
+ }
+ 
++/* Look up an exact post name (FNV-1a over the candidate). */
++static int cui__em_post_lookup(const cui__emoji *e, const char *name, int len) {
++    if (!e->post_map || !e->post_map_n || len <= 0) return 0;
++    uint32_t h = 2166136261u;
++    for (int i = 0; i < len; i++) h = (h ^ (unsigned char)name[i]) * 16777619u;
++    uint32_t mask = e->post_map_n - 1, slot = h & mask;
++    for (uint32_t n = 0; n < e->post_map_n; n++) {
++        const cui__em_post_slot *s = &e->post_map[slot];
++        if (!s->used) return 0;
++        if (s->hash == h) {
++            const uint8_t *p = e->post + s->off;
++            if (p[0] == (uint8_t)len && !memcmp(p + 1, name, (size_t)len)) return s->gid;
++        }
++        slot = (slot + 1) & mask;
++    }
++    return 0;
++}
++
++/* A glyph found through the font's post names. Apple Color Emoji has no GSUB;
++ * its skin-tone glyphs are morx ligatures named u1F44D.1 (and longer variants
++ * such as u1F469_u2695.2). Try the tone digits at each component boundary,
++ * then the untoned .0 name so a missing variant still shows the base emoji. */
++static int cui__em_post_glyph(const cui__emoji *e, const uint32_t *cps, int n) {
++    if (!e->post_map) return 0;
++    char tok[24][16];
++    int ntok = 0, ntone = 0;
++    char tones[8] = {0}, gender = 0;
++    for (int i = 0; i < n && ntok < 24; i++) {
++        uint32_t c = cps[i];
++        if (c == 0x200D || c == 0xFE0F) continue;
++        if (c == 0x2640) { gender = 'W'; continue; }
++        if (c == 0x2642) { gender = 'M'; continue; }
++        if (c >= 0x1F3FB && c <= 0x1F3FF) {
++            if (ntone < 7) tones[ntone++] = (char)('1' + (c - 0x1F3FB));
++            continue;
++        }
++        int tl = snprintf(tok[ntok], sizeof tok[0], "u%X", (unsigned)c);
++        if (tl <= 0 || tl >= (int)sizeof tok[0]) return 0;
++        ntok++;
++    }
++    tones[ntone] = 0;
++    if (!ntok) return 0;
++    char gs[3] = {0};
++    if (gender) { gs[0] = '.'; gs[1] = gender; }
++
++    for (int pass = 0; pass < 2; pass++) {
++        if (pass == 1 && !ntone) break;
++        const char *ts = pass == 0 ? (ntone ? tones : "0") : "0";
++        for (int cut = 1; cut <= ntok; cut++) {
++            char left[320], right[320];
++            size_t ll = 0, rl = 0;
++            for (int i = 0; i < cut; i++) {
++                if (i && ll + 1 < sizeof left) left[ll++] = '_';
++                size_t tl = strlen(tok[i]);
++                if (ll + tl >= sizeof left) break;
++                memcpy(left + ll, tok[i], tl); ll += tl;
++            }
++            for (int i = cut; i < ntok; i++) {
++                if (i > cut && rl + 1 < sizeof right) right[rl++] = '_';
++                size_t tl = strlen(tok[i]);
++                if (rl + tl >= sizeof right) break;
++                memcpy(right + rl, tok[i], tl); rl += tl;
++            }
++            left[ll] = right[rl] = 0;
++            for (int sep = 0; sep < 2; sep++) {
++                const char *rs = right[0] ? (sep ? "." : "_") : "";
++                char cand[700];
++                int cl = snprintf(cand, sizeof cand, "%s.%s%s%s%s", left, ts, gs, rs, right);
++                int gid = cl > 0 ? cui__em_post_lookup(e, cand, cl) : 0;
++                if (gid) return gid;
++                if (gender) {
++                    cl = snprintf(cand, sizeof cand, "%s.%c.%s%s%s", left, gender, ts, rs, right);
++                    gid = cl > 0 ? cui__em_post_lookup(e, cand, cl) : 0;
++                    if (gid) return gid;
++                }
++            }
++        }
++    }
++    char plain[320];
++    size_t pl = 0;
++    for (int i = 0; i < ntok; i++) {
++        if (i && pl + 1 < sizeof plain) plain[pl++] = '_';
++        size_t tl = strlen(tok[i]);
++        if (pl + tl >= sizeof plain) break;
++        memcpy(plain + pl, tok[i], tl); pl += tl;
++    }
++    plain[pl] = 0;
++    int gid = cui__em_post_lookup(e, plain, (int)pl);
++    if (gid) return gid;
++    if (gender) {
++        char cg[330];
++        int cl = snprintf(cg, sizeof cg, "%s.%c", plain, gender);
++        if (cl > 0) return cui__em_post_lookup(e, cg, cl);
++    }
++    return 0;
++}
++
+ /* the glyph for a whole sequence, or 0 */
+ static int cui__em_glyph(const cui__emoji *e, const char *utf8, int len) {
+     uint32_t cps[24];
+@@ -408,7 +558,7 @@ static int cui__em_glyph(const cui__emoji *e, const char *utf8, int len) {
+         m = cui__em_gsub(e, g, m);
+         if (m == 1 && g[0]) return g[0];
+     }
+-    return 0;
++    return cui__em_post_glyph(e, cps, n);
+ }
+ 
+ /* ------------------------------------------------------------------------ */
+@@ -705,7 +855,7 @@ static int cui__em_get_slot(cui_ctx *ui, cui__emoji *e, const char *utf8, int le
      if (need > e->cell) {   /* bigger cells: start over */
          cui__emoji_drop_texture(ui);
          e->cell = need;
@@ -20,7 +232,7 @@ index c15f341..7725499 100644
          e->per_row = e->atlas / e->cell;
          e->nslots = CUI_MIN(e->per_row * e->per_row, CUI__EM_SLOTS_MAX);
          memset(e->slots, 0, sizeof e->slots);
-@@ -878,6 +878,16 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
+@@ -878,6 +1028,16 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
  }
  
  
@@ -37,7 +249,7 @@ index c15f341..7725499 100644
  /* every word of the query starts a word of the name */
  static bool cui__em_match(const char *name, int nlen, const char *q) {
      while (*q) {
-@@ -893,6 +903,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
+@@ -893,6 +1053,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
              while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
              found = k == wl;
          }
@@ -52,7 +264,7 @@ index c15f341..7725499 100644
          if (!found) return false;
      }
      return true;
-@@ -1107,6 +1125,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
+@@ -1107,6 +1275,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
                  const cui__em_rec *rec = &e->recs[i];
                  const char *name = e->data + rec->name;
                  bool m = cui__em_match(name, rec->name_len, st->query);
@@ -60,7 +272,7 @@ index c15f341..7725499 100644
                  if (!m) continue;
                  size_t ql = strlen(st->query);
                  bool lead = ql <= rec->name_len;
-@@ -1453,7 +1472,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
+@@ -1453,7 +1622,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
      cui_node *rn = &ui->nodes[row];
      rn->dir = CUI_ROW; rn->align = CUI_ALIGN_CENTER; rn->w = CUI_FILL; rn->h = CUI_PX(48); rn->gap = 10; rn->pad[1] = rn->pad[3] = 12;
      cui__open(ui, row);
@@ -69,6 +281,28 @@ index c15f341..7725499 100644
      if (f->can && show >= 0 && show < st->nitems) {
          cui__em_str t = cui__em_item_text(f->e, st, f->recent, st->items[show], *f->tone);
          cui_emoji(ui, t.s, 28);
+diff --git a/src/cui_overlay.c b/src/cui_overlay.c
+index 7620d3f..fa3d73a 100644
+--- a/src/cui_overlay.c
++++ b/src/cui_overlay.c
+@@ -75,7 +75,7 @@ bool cui_popover_is_open(cui_ctx *ui, const char *id) {
+ static void cui__panel_style(cui_ctx *ui, cui_node *n, float pad) {
+     n->bg = CUI_C(ui, SURFACE_RAISED);
+     n->border = 1;
+-    n->border_color = ui->mode == CUI_THEME_DARK ? CUI_C(ui, BORDER) : cui_alpha(cui__rgba(0, 0, 0, 255), 0.07f);
++    n->border_color = CUI_C(ui, BORDER);
+     n->radius = CUI_CORNERS(ui->theme.radius_panel);
+     n->elevation = CUI_ELEVATION_FLOATING;
+     n->elevation_alpha = 1;
+@@ -347,7 +347,7 @@ bool cui_select_ex(cui_ctx *ui, const char *id_str, const char *const *items, in
+     n->radius = CUI_CORNERS(CUI__R_CONTROL(ui, h));
+     n->bg = CUI_C(ui, SURFACE);
+     n->border = 1;
+-    cui_color border = cui__control_edge(ui, st->hover);
++    cui_color border = CUI_C(ui, BORDER);
+     n->border_color = cui_mix(border, cui__edge_on(ui), open ? 1.0f : 0.0f);
+     n->opacity = disabled ? CUI__DISABLED : 1.0f;
+     cui__mark_interactive(ui, i, CUI_IF_FOCUSABLE);
 diff --git a/src/cui_textedit.c b/src/cui_textedit.c
 index cfca9d8..3f95724 100644
 --- a/src/cui_textedit.c
