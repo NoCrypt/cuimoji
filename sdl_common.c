@@ -44,44 +44,60 @@ static int mods(void) {
     return r;
 }
 
-bool cuimoji_sdl_pump(cui_ctx *ui) {
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        switch (e.type) {
-        case SDL_QUIT: return false;
-        case SDL_WINDOWEVENT:
-            switch (e.window.event) {
-            case SDL_WINDOWEVENT_LEAVE: cui_input_mouse_leave(ui); break;
-            case SDL_WINDOWEVENT_FOCUS_LOST: cui_input_focus(ui, false); break;
-            case SDL_WINDOWEVENT_FOCUS_GAINED: cui_input_focus(ui, true); break;
-            }
-            break;
-        case SDL_MOUSEMOTION:
-            cui_input_mouse_move(ui, (float)e.motion.x, (float)e.motion.y);
-            break;
-        case SDL_MOUSEBUTTONDOWN:
-        case SDL_MOUSEBUTTONUP: {
-            cui_mouse_button b = e.button.button == SDL_BUTTON_RIGHT ? CUI_MOUSE_RIGHT
-                                : e.button.button == SDL_BUTTON_MIDDLE ? CUI_MOUSE_MIDDLE
-                                : CUI_MOUSE_LEFT;
-            cui_input_mouse_move(ui, (float)e.button.x, (float)e.button.y);
-            cui_input_mouse_button(ui, b, e.type == SDL_MOUSEBUTTONDOWN);
-            break;
+static bool handle_event(cui_ctx *ui, const SDL_Event *ev) {
+    const SDL_Event e = *ev;
+    switch (e.type) {
+    case SDL_QUIT:
+        cuimoji_quit_requested = true;
+        return true;
+    case SDL_WINDOWEVENT:
+        switch (e.window.event) {
+        case SDL_WINDOWEVENT_LEAVE: cui_input_mouse_leave(ui); return true;
+        case SDL_WINDOWEVENT_FOCUS_LOST: cui_input_focus(ui, false); return true;
+        case SDL_WINDOWEVENT_FOCUS_GAINED: cui_input_focus(ui, true); return true;
+        /* SDL acks an interactive resize on the next frame callback, so an
+         * exposure must produce a commit or the resize stalls. */
+        case SDL_WINDOWEVENT_EXPOSED:
+        case SDL_WINDOWEVENT_RESIZED:
+        case SDL_WINDOWEVENT_SIZE_CHANGED: return true;
         }
-        case SDL_MOUSEWHEEL:
-            cui_input_scroll(ui, (float)e.wheel.x, (float)e.wheel.y);
-            break;
-        case SDL_KEYDOWN:
-        case SDL_KEYUP: {
-            cui_key k = map_key(e.key.keysym.sym);
-            if (k != CUI_KEY_NONE) cui_input_key(ui, k, e.type == SDL_KEYDOWN, mods());
-            break;
-        }
-        case SDL_TEXTINPUT:
-            cui_input_text(ui, e.text.text);
-            break;
-        }
+        return false;
+    case SDL_MOUSEMOTION:
+        cui_input_mouse_move(ui, (float)e.motion.x, (float)e.motion.y);
+        return true;
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP: {
+        cui_mouse_button b = e.button.button == SDL_BUTTON_RIGHT ? CUI_MOUSE_RIGHT
+                            : e.button.button == SDL_BUTTON_MIDDLE ? CUI_MOUSE_MIDDLE
+                            : CUI_MOUSE_LEFT;
+        cui_input_mouse_move(ui, (float)e.button.x, (float)e.button.y);
+        cui_input_mouse_button(ui, b, e.type == SDL_MOUSEBUTTONDOWN);
+        return true;
     }
+    case SDL_MOUSEWHEEL:
+        cui_input_scroll(ui, (float)e.wheel.x, (float)e.wheel.y);
+        return true;
+    case SDL_KEYDOWN:
+    case SDL_KEYUP: {
+        cui_key k = map_key(e.key.keysym.sym);
+        if (k != CUI_KEY_NONE) cui_input_key(ui, k, e.type == SDL_KEYDOWN, mods());
+        return true;
+    }
+    case SDL_TEXTINPUT:
+        cui_input_text(ui, e.text.text);
+        return true;
+    }
+    return false;
+}
+
+bool cuimoji_sdl_pump(cui_ctx *ui, int wait_ms, bool *woke) {
+    if (woke) *woke = false;
+    SDL_Event e;
+    if (wait_ms > 0) {
+        if (SDL_WaitEventTimeout(&e, wait_ms) && handle_event(ui, &e) && woke) *woke = true;
+    }
+    while (SDL_PollEvent(&e))
+        if (handle_event(ui, &e) && woke) *woke = true;
     return !cuimoji_quit_requested && !cuimoji_toggle_requested;
 }
 

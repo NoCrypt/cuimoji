@@ -201,18 +201,42 @@ int cuimoji_run_sdl(void) {
 
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
+    bool have_frame = false, pending = false;
+    int draw_w = 0, draw_h = 0;
 
     while (!cuimoji_quit_requested && !cuimoji_toggle_requested) {
-        if (!cuimoji_sdl_pump(ui)) break;
+        /* Render only when something moves: pending work, a CUI animation or
+         * settle frame, an input event, or a CUI timer that is due. */
+        bool dirty = pending || !have_frame || cui_needs_redraw(ui);
+        int wake_ms = -1;
+        if (!dirty) {
+            float wake = cui_next_wakeup(ui);
+            if (wake >= 0) {
+                wake_ms = (int)(wake * 1000.0f);
+                if (wake_ms < 0) wake_ms = 0;
+            }
+        }
+        int wait_ms = dirty ? 0 : 200;
+        if (wake_ms >= 0 && wake_ms < wait_ms) wait_ms = wake_ms;
+        bool timer_due = wake_ms >= 0 && wake_ms <= wait_ms;
+
+        bool woke = false;
+        if (!cuimoji_sdl_pump(ui, wait_ms, &woke)) break;
         wl_display_dispatch_pending(wldpy);
 
         int ww = 0, wh = 0;
         SDL_GetWindowSize(sdl_win, &ww, &wh);
         if (ww <= 0 || wh <= 0) { SDL_Delay(8); continue; }
+        bool size_diff = (ww != draw_w || wh != draw_h);
+
+        /* Idle: no input, no size change, no timer, nothing moving. */
+        if (have_frame && !size_diff && !woke && !timer_due && !pending && !cui_needs_redraw(ui))
+            continue;
 
         /* Both buffers still held by the compositor: wait for a release. */
         shm_buf *b = buf_get(ww, wh);
-        if (!b) { SDL_Delay(2); continue; }
+        if (!b) { pending = true; SDL_Delay(1); continue; }
+        pending = false;
 
         uint64_t now = SDL_GetPerformanceCounter();
         float dt = (float)((double)(now - last) / (double)freq);
@@ -232,6 +256,9 @@ int cuimoji_run_sdl(void) {
         wl_surface_damage(surf, 0, 0, ww, wh);
         wl_surface_commit(surf);
         b->busy = true;
+        have_frame = true;
+        draw_w = ww;
+        draw_h = wh;
         wl_display_flush(wldpy);
     }
 
