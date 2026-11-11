@@ -188,7 +188,7 @@ int cuimoji_run_sdl(void) {
     SDL_StartTextInput();
 
     int draw_w = 0, draw_h = 0;
-    Uint32 last_draw_ms = 0, last_size_ms = 0, last_render_ms = 4;
+    Uint32 last_draw_ms = 0, last_size_ms = 0;
     bool have_frame = false;
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
@@ -209,22 +209,14 @@ int cuimoji_run_sdl(void) {
             SDL_Delay(8);
             continue;
         }
-        if (have_frame) {
-            /* Adaptive throttle: never render faster than 2x the last frame,
-             * and during a drag wait for a short pause (40 ms) before drawing,
-             * so a sudden resize does not queue several expensive frames.
-             * A continuous drag still gets a frame every 120 ms. */
-            Uint32 since_draw = now_ms - last_draw_ms;
-            Uint32 since_change = now_ms - last_size_ms;
-            Uint32 interval = last_render_ms * 2;
-            if (interval < 33) interval = 33;
-            if (interval > 150) interval = 150;
-            bool may_draw = since_change >= 40 || since_draw >= 120;
-            if ((size_diff && !may_draw) || since_draw < interval) {
-                last = SDL_GetPerformanceCounter();
-                SDL_Delay(2);
-                continue;
-            }
+        /* While the size is changing, draw every frame: the compositor's
+         * buffer release is the only pacing. When idle, keep animations at
+         * roughly 60 fps. */
+        bool resizing = size_diff || (Uint32)(now_ms - last_size_ms) < 150;
+        if (have_frame && !resizing && (Uint32)(now_ms - last_draw_ms) < 16) {
+            last = SDL_GetPerformanceCounter();
+            SDL_Delay(1);
+            continue;
         }
 
         shm_buf *b = buf_get(ww, wh);
@@ -241,7 +233,6 @@ int cuimoji_run_sdl(void) {
         cui_end_frame(ui);
         if (cuimoji_quit_requested || cuimoji_toggle_requested) break;
 
-        Uint32 render_start = SDL_GetTicks();
         const cui_draw_data *dd = cui_get_draw_data(ui);
         cui_sw_render(sw, dd, b->data, ww, wh, ww * 4, CUI_SW_BGRA);
 
@@ -253,8 +244,6 @@ int cuimoji_run_sdl(void) {
         draw_w = ww;
         draw_h = wh;
         last_draw_ms = now_ms;
-        last_render_ms = SDL_GetTicks() - render_start;
-        if (last_render_ms == 0) last_render_ms = 1;
         wl_display_flush(wldpy);
     }
 
