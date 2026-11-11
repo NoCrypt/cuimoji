@@ -1,0 +1,20 @@
+--- a/src/cui_emoji.c
++++ b/src/cui_emoji.c
+@@ -15,7 +15,7 @@
+ #define CUI__EM_ATLAS_MAX 1024
+ #define CUI__EM_IDLE 600   /* frames without an emoji before the texture is let go */
+ #define CUI__EM_SLOTS_MAX 1024
+-#define CUI__EM_BUDGET 12   /* new emoji drawn per frame; the rest come next frame */
++#define CUI__EM_BUDGET 256   /* new emoji drawn per frame; the rest come next frame */
+ 
+ typedef struct { uint32_t key; uint16_t px; uint8_t state; bool mono; uint64_t used; } cui__em_slot;   /* state: 0 empty, 1 drawn, 2 missing */
+ 
+@@ -705,7 +705,7 @@
+     if (need > e->cell) {   /* bigger cells: start over */
+         cui__emoji_drop_texture(ui);
+         e->cell = need;
+-        e->atlas = e->cell <= 40 ? 512 : CUI__EM_ATLAS_MAX;   /* small emoji fit a quarter of the texture */
++        e->atlas = CUI__EM_ATLAS_MAX;   /* small emoji fit a quarter of the texture */
+         e->per_row = e->atlas / e->cell;
+         e->nslots = CUI_MIN(e->per_row * e->per_row, CUI__EM_SLOTS_MAX);
+         memset(e->slots, 0, sizeof e->slots);
