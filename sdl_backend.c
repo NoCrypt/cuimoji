@@ -194,7 +194,16 @@ int cuimoji_run_sdl(void) {
     uint64_t last = SDL_GetPerformanceCounter();
 
     while (!cuimoji_quit_requested && !cuimoji_toggle_requested) {
-        if (!cuimoji_sdl_pump(ui)) break;
+        bool dirty = !have_frame || cui_needs_redraw(ui);
+        int wait_ms = dirty ? 0 : 200;
+        if (!dirty) {
+            float wake = cui_next_wakeup(ui);
+            if (wake >= 0) {
+                int w = (int)(wake * 1000.0f);
+                if (w < wait_ms) wait_ms = w;
+            }
+        }
+        if (!cuimoji_sdl_pump(ui, wait_ms)) break;
         wl_display_dispatch_pending(wldpy);
 
         int ww = 0, wh = 0;
@@ -204,11 +213,8 @@ int cuimoji_run_sdl(void) {
         Uint32 now_ms = SDL_GetTicks();
         bool size_diff = (ww != draw_w || wh != draw_h);
         if (size_diff) last_size_ms = now_ms;
-        /* Nothing changed: do not render. */
-        if (have_frame && !size_diff && !cui_needs_redraw(ui)) {
-            SDL_Delay(8);
-            continue;
-        }
+        /* Nothing changed: the next pump waits for an event. */
+        if (have_frame && !size_diff && !cui_needs_redraw(ui)) continue;
         /* While the size is changing, draw every frame: the compositor's
          * buffer release is the only pacing. When idle, keep animations at
          * roughly 60 fps. */

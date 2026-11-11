@@ -61,8 +61,10 @@ int cuimoji_run_vulkan(void) {
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
 
+    bool rendered_once = false;
     while (!cuimoji_quit_requested && !cuimoji_toggle_requested) {
-        if (!cuimoji_sdl_pump(ui)) break;
+        bool dirty = !rendered_once || cui_needs_redraw(ui);
+        if (!cuimoji_sdl_pump(ui, dirty ? 0 : 200)) break;
 
         int ww = 0, wh = 0, pw = 0, ph = 0;
         SDL_GetWindowSize(vk_win, &ww, &wh);
@@ -72,7 +74,9 @@ int cuimoji_run_vulkan(void) {
             last_pw = pw;
             last_ph = ph;
             cui_vk_resize(vk);
+            dirty = true;
         }
+        if (!dirty) continue;
 
         float scale = ww > 0 ? (float)pw / (float)ww : 1.0f;
         cui_set_viewport(ui, (float)ww, (float)wh, scale);
@@ -88,6 +92,7 @@ int cuimoji_run_vulkan(void) {
         if (cuimoji_quit_requested) break;
         const cui_draw_data *dd = cui_get_draw_data(ui);
         if (!cui_vk_render(vk, dd)) cui_vk_render(vk, dd);
+        rendered_once = true;
     }
 
     cui_destroy(ui);

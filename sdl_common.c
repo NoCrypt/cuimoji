@@ -44,11 +44,10 @@ static int mods(void) {
     return r;
 }
 
-bool cuimoji_sdl_pump(cui_ctx *ui) {
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        switch (e.type) {
-        case SDL_QUIT: return false;
+static void handle_event(cui_ctx *ui, const SDL_Event *ev) {
+    SDL_Event e = *ev;
+    switch (e.type) {
+        case SDL_QUIT: cuimoji_quit_requested = true; break;
         case SDL_WINDOWEVENT:
             switch (e.window.event) {
             case SDL_WINDOWEVENT_LEAVE: cui_input_mouse_leave(ui); break;
@@ -80,8 +79,17 @@ bool cuimoji_sdl_pump(cui_ctx *ui) {
         case SDL_TEXTINPUT:
             cui_input_text(ui, e.text.text);
             break;
-        }
     }
+}
+
+/* wait_ms > 0 blocks until an event arrives or the timeout passes: idle costs
+ * no CPU, input wakes it immediately. */
+bool cuimoji_sdl_pump(cui_ctx *ui, int wait_ms) {
+    SDL_Event e;
+    if (wait_ms > 0) {
+        if (SDL_WaitEventTimeout(&e, wait_ms)) handle_event(ui, &e);
+    }
+    while (SDL_PollEvent(&e)) handle_event(ui, &e);
     return !cuimoji_quit_requested && !cuimoji_toggle_requested;
 }
 

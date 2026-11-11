@@ -39,7 +39,7 @@ popover, three renderers, and a fast auto-paste path.
   Wayland window presents through double-buffered `wl_shm` buffers, and while
   the size is changing nothing new is committed, so the compositor scales the
   last buffer instead of flashing intermediate sizes. Frames are rendered only
-  when something changes (idle costs ~0.7% of one core at ~12 MB PSS).
+  when something changes; idle costs no measurable CPU (~12 MB PSS).
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no
   D-Bus round trip. Terminals get Ctrl+Shift+V.
