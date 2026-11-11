@@ -6,6 +6,7 @@
 
 #define CUIMOJI_WIN_W 360
 #define CUIMOJI_WIN_H 480
+#define CUIMOJI_VERSION "0.1"
 
 /* Shared between the X11 app loop, the SDL2 software loop and the SDL2
  * Vulkan loop. */

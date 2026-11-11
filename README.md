@@ -9,7 +9,8 @@ popover, three renderers, and a fast auto-paste path.
 
 ## Features
 
-- **Grid**: recents, nine Unicode groups, skin tones, search by name.
+- **Grid**: recents, nine Unicode groups, skin tones, search by name
+  (substring matches too: "burger" finds "hamburger").
 - **First focus on the first recent emoji** when the picker opens, so Enter
   picks your most recent emoji. Typing switches to the search field; Down goes
   back into the grid.
@@ -26,7 +27,9 @@ popover, three renderers, and a fast auto-paste path.
   - **Window system** — Auto / Wayland / X11. Auto uses the Wayland-native
     SDL2 window when a Wayland session is available, with the X11 window as
     the fallback. Applied on the next launch.
-- **Resizable window**: the grid and the 34 px bottom bar follow the size.
+- **Bottom bar**: shows the hovered emoji and its name, or `cuimoji <version>`
+  when nothing is hovered, with the settings gear inline.
+- **Resizable window**: the grid and the bottom bar follow the size.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no
   D-Bus round trip. Terminals get Ctrl+Shift+V.
@@ -47,7 +50,8 @@ X11 window only). CUI v1.2.0 is fetched by CMake.
 
 CUI is patched by `patches/cui-fast-emoji.patch`: it draws up to 256 new emoji
 per frame and keeps the 1024 texture, so the grid is complete on the first
-frame instead of filling in over ~10 frames.
+frame instead of filling in over ~10 frames; search also falls back to plain
+substring matches.
 
 ## Key binding (niri)
 

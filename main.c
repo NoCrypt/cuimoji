@@ -53,7 +53,7 @@ static char picker_id[32] = PICKER_ID;
 static int picker_gen;
 static bool font_pending;
 #define GRID_H 592
-#define FOOTER_H 34
+#define FOOTER_H 48   /* matches CUI's emoji preview row */
 #define DEFAULT_FOCUS_DELAY_MS 20
 #define ICON_OVERLAY_PX 22.0f   /* CUI draws picker icons at 18 px, too small on
                                  * this font stack; we redraw them a bit larger */
@@ -448,13 +448,11 @@ static void draw_picker_icons(cui_ctx *ui) {
 static void paint_picker_icons(cui_ctx *ui, cui_node *n, void *data) {
     (void)n;
     (void)data;
-    if (footer_h > 0) {
-        cui_draw_rect(ui, (cui_rect){ 0, footer_y, ui->vw, footer_h }, CUI_CORNERS(0), CUI_C(ui, SURFACE));
-        cui_draw_rect(ui, (cui_rect){ 0, footer_y, ui->vw, 1 }, CUI_CORNERS(0), CUI_C(ui, BORDER_SUBTLE));
-        float fs = cui__fs(ui, 13);
-        cui__draw_text_line(ui, CUI_FONT_BODY, fs, 14, footer_y + (footer_h - fs * 1.3f) * 0.5f,
-                            CUI_C(ui, TEXT_MUTED), "Pick an emoji", -1, false);
-    }
+    (void)footer_y;
+    (void)footer_h;
+    /* CUI's own preview row draws the divider, the hovered emoji and its
+     * name (or the hint when nothing is hovered); only the picker icons are
+     * overlaid here. */
     draw_picker_icons(ui);
 }
 
@@ -559,6 +557,8 @@ void cuimoji_ui(cui_ctx *ui) {
         /* The picker no longer has CUI's 48 px preview row. Leave room for
          * our own 34 px footer instead: "Pick an emoji" on the left, the
          * settings gear on the right, both on the same line. */
+        static char hint[48];
+        snprintf(hint, sizeof hint, "cuimoji %s", CUIMOJI_VERSION);
         ui->theme.font_scale = (float)ui_scale / 100.0f;
         /* The grid view starts below the search row and the group tabs; its
          * y position is the chrome height (they scale with the UI size). */
@@ -581,7 +581,7 @@ void cuimoji_ui(cui_ctx *ui) {
                 .recent_cap = sizeof recent,
                 .tone = &tone,
                 .placeholder = "Search emoji",
-                .no_preview = true);
+                .hint = hint);
 
             if (emoji) {
                 do_pick(ui, emoji);

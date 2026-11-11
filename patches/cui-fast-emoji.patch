@@ -18,3 +18,18 @@
          e->per_row = e->atlas / e->cell;
          e->nslots = CUI_MIN(e->per_row * e->per_row, CUI__EM_SLOTS_MAX);
          memset(e->slots, 0, sizeof e->slots);
+@@ -893,6 +893,14 @@
+             while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
+             found = k == wl;
+         }
++        if (!found) {
++            /* fall back to a plain substring, so "burger" finds "hamburger" */
++            for (int i = 0; i + wl <= nlen && !found; i++) {
++                int k = 0;
++                while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
++                found = k == wl;
++            }
++        }
+         if (!found) return false;
+     }
+     return true;
