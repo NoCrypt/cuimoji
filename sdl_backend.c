@@ -25,6 +25,11 @@ int cuimoji_run_sdl(void) {
     if (getenv("WAYLAND_DISPLAY")) setenv("SDL_VIDEODRIVER", "wayland", 0);
     SDL_SetHint(SDL_HINT_APP_NAME, "cuimoji");
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
+    /* no decorations (borderless window) and no GPU surfaces for this UI */
+    SDL_SetHint("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0");
+    SDL_SetHint("SDL_VIDEO_WAYLAND_PREFER_LIBDECOR", "0");
+    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "cuimoji: SDL_Init: %s\n", SDL_GetError());
         return 1;
@@ -39,8 +44,10 @@ int cuimoji_run_sdl(void) {
         return 1;
     }
 
-    SDL_Renderer *ren = SDL_CreateRenderer(sdl_win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!ren) ren = SDL_CreateRenderer(sdl_win, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_PRESENTVSYNC);
+    /* Software only: an accelerated SDL renderer opens an EGL context and
+     * maps the whole GPU driver, which costs tens of MB for this UI. */
+    SDL_SetWindowBordered(sdl_win, SDL_FALSE);
+    SDL_Renderer *ren = SDL_CreateRenderer(sdl_win, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_PRESENTVSYNC);
     if (!ren) ren = SDL_CreateRenderer(sdl_win, -1, SDL_RENDERER_SOFTWARE);
     if (!ren) {
         fprintf(stderr, "cuimoji: SDL_CreateRenderer: %s\n", SDL_GetError());
