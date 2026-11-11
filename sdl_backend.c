@@ -28,6 +28,8 @@ int cuimoji_run_sdl(void) {
     /* no decorations (borderless window) and no GPU surfaces for this UI */
     SDL_SetHint("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0");
     SDL_SetHint("SDL_VIDEO_WAYLAND_PREFER_LIBDECOR", "0");
+    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "cuimoji: SDL_Init: %s\n", SDL_GetError());
         return 1;
@@ -84,8 +86,6 @@ int cuimoji_run_sdl(void) {
     int pix_w = 0, pix_h = 0;
     SDL_Texture *tex = NULL;
     int tex_w = 0, tex_h = 0;
-    Uint32 last_draw_ms = 0;
-    bool have_frame = false;
 
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
@@ -98,41 +98,19 @@ int cuimoji_run_sdl(void) {
         SDL_GetRendererOutputSize(ren, &pw, &ph);
         if (ww <= 0 || wh <= 0 || pw <= 0 || ph <= 0) { SDL_Delay(8); continue; }
 
-        Uint32 now_ms = SDL_GetTicks();
-        bool size_diff = (pw != tex_w || ph != tex_h);
-        /* While resizing, draw at up to ~30 fps so the content follows the
-         * drag; between those frames the compositor scales the last buffer.
-         * The texture is rebuilt for each new size, which is cheap here. */
-        if (have_frame && size_diff && (Uint32)(now_ms - last_draw_ms) < 33) {
-            last = SDL_GetPerformanceCounter();
-            SDL_Delay(2);
-            continue;
-        }
-        /* Nothing changed and no animation: no need to redraw. */
-        if (have_frame && !size_diff && !cui_needs_redraw(ui)) {
-            SDL_Delay(8);
-            continue;
-        }
-
         if (pw != pix_w || ph != pix_h) {
             unsigned char *n = realloc(pixels, (size_t)pw * (size_t)ph * 4);
             if (!n) { SDL_Delay(8); continue; }
             pixels = n;
             pix_w = pw;
             pix_h = ph;
+            if (tex_w != pw || tex_h != ph) {
+                if (tex) SDL_DestroyTexture(tex);
+                tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, pw, ph);
+                tex_w = pw;
+                tex_h = ph;
+            }
         }
-        /* Create the new texture before dropping the old one. */
-        if (tex_w != pw || tex_h != ph) {
-            SDL_Texture *nt = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
-                                                SDL_TEXTUREACCESS_STREAMING, pw, ph);
-            if (!nt) { SDL_Delay(8); continue; }
-            SDL_SetTextureScaleMode(nt, SDL_ScaleModeLinear);
-            if (tex) SDL_DestroyTexture(tex);
-            tex = nt;
-            tex_w = pw;
-            tex_h = ph;
-        }
-        if (!tex) { SDL_Delay(8); continue; }
 
         float scale = ww > 0 ? (float)pw / (float)ww : 1.0f;
         cui_set_viewport(ui, (float)ww, (float)wh, scale);
@@ -150,13 +128,12 @@ int cuimoji_run_sdl(void) {
         const cui_draw_data *dd = cui_get_draw_data(ui);
         cui_sw_render(sw, dd, pixels, pw, ph, pw * 4, CUI_SW_RGBA);
 
-        SDL_UpdateTexture(tex, NULL, pixels, pw * 4);
-        /* The copy covers the whole drawable; clearing first only adds a
-         * dark flash between resize frames. */
-        SDL_RenderCopy(ren, tex, NULL, NULL);
+        SDL_RenderClear(ren);
+        if (tex) {
+            SDL_UpdateTexture(tex, NULL, pixels, pw * 4);
+            SDL_RenderCopy(ren, tex, NULL, NULL);
+        }
         SDL_RenderPresent(ren);
-        have_frame = true;
-        last_draw_ms = SDL_GetTicks();
     }
 
     SDL_StopTextInput();

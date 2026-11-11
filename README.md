@@ -65,9 +65,8 @@ substring matches.
 Mod+Period hotkey-overlay-title="Open cuimoji" { spawn "/home/ncpt/Project/cuimoji/build/cuimoji"; }
 
 window-rule {
-    match app-id=r#"^(cuimoji|CUI)$"#
+    match app-id=r#"^cuimoji$"#
     open-floating true
-    baba-is-float true
     default-column-width { fixed 360; }
     default-window-height { fixed 480; }
 }
@@ -75,11 +74,7 @@ window-rule {
 
 The rule keeps it floating (it is resizable, so niri would tile it
 otherwise) and opens it at 360x480, the app's default size. The minimum it
-can be resized to is 240x260. It matches the X11 app's initial `CUI` class
-too, so the window floats on every launch.
-
-Pressing the key binding again while the picker is open closes it: the app
-is single-instance, and a second launch just signals the running one.
+can be resized to is 240x260.
 
 ## How the paste works
 
