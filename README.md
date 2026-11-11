@@ -14,18 +14,21 @@ popover, three renderers, and a fast auto-paste path.
   picks your most recent emoji. Typing switches to the search field; Down goes
   back into the grid.
 - **Settings** (gear in the bottom bar, or `F1`):
+  - **Theme** — Dark / Light.
   - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
     `F2` cycles sets.
   - **Emoji size** — 20 to 40 px.
   - **UI size** — Small / Default / Large.
+  - **Paste delay (fallback)** — the wait used when niri cannot be asked for
+    the focused window (0-100 ms, default 20).
   - **Renderer** — Software, OpenGL, Vulkan. Applied on the next launch.
 - **Resizable window**: the grid and the 34 px bottom bar follow the size.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no
   D-Bus round trip. Terminals get Ctrl+Shift+V.
-- Recents, skin tone, emoji font, sizes and renderer are saved in
-  `$XDG_STATE_HOME/cuimoji/state`.
+- Recents, skin tone, emoji font, sizes, theme, paste delay and renderer are
+  saved in `$XDG_STATE_HOME/cuimoji/state`.
 
 ## Build
 

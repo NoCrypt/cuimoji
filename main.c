@@ -66,6 +66,8 @@ static int tone;
 static int renderer_mode;   /* 0 software, 1 OpenGL, 2 Vulkan */
 static int emoji_size = 28;
 static int ui_scale = 100;
+static int paste_delay_ms = 20;   /* fallback when niri cannot be asked */
+static int theme_mode;            /* 0 dark, 1 light */
 static bool initial_focus_done;
 static bool debug_on;
 static int uinput_fd = -1;
@@ -141,7 +143,7 @@ static bool focused_app_id(char *out, size_t cap) {
 }
 
 static double wait_for_focus(char *target, size_t cap, double start) {
-    int delay_ms = DEFAULT_FOCUS_DELAY_MS;
+    int delay_ms = paste_delay_ms;
     const char *env = getenv("CUIMOJI_PASTE_DELAY_MS");
     if (env && atoi(env) >= 0) delay_ms = atoi(env);
 
@@ -243,6 +245,13 @@ void cuimoji_state_load(void) {
         } else if (strncmp(line, "emoji_font=", 11) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             snprintf(selected_font, sizeof selected_font, "%s", line + 11);
+        } else if (strncmp(line, "paste_delay=", 12) == 0) {
+            paste_delay_ms = atoi(line + 12);
+            if (paste_delay_ms < 0) paste_delay_ms = 0;
+            if (paste_delay_ms > 500) paste_delay_ms = 500;
+        } else if (strncmp(line, "theme=", 6) == 0) {
+            line[strcspn(line, "\r\n")] = 0;
+            theme_mode = strcmp(line + 6, "light") == 0 ? 1 : 0;
         } else if (strncmp(line, "emoji_size=", 11) == 0) {
             emoji_size = atoi(line + 11);
             if (emoji_size < 16) emoji_size = 16;
@@ -268,8 +277,9 @@ void cuimoji_state_save(void) {
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
     FILE *f = fopen(tmp, "w");
     if (!f) return;
-    fprintf(f, "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\nrenderer=%s\n",
-            tone, recent, selected_font, emoji_size, ui_scale,
+    fprintf(f, "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\npaste_delay=%d\ntheme=%s\nrenderer=%s\n",
+            tone, recent, selected_font, emoji_size, ui_scale, paste_delay_ms,
+            theme_mode ? "light" : "dark",
             renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software");
     fclose(f);
     rename(tmp, path);
@@ -515,6 +525,12 @@ void cuimoji_ui(cui_ctx *ui) {
         cuimoji_state_save();
     }
 
+    static int applied_theme = -1;
+    if (applied_theme != theme_mode) {
+        cui_set_theme(ui, theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK);
+        applied_theme = theme_mode;
+    }
+
     if (!initial_focus_done) {
         /* Start with the keyboard cursor on the first item: the most recent
          * emoji, or the first one in the current group when there are none. */
@@ -580,6 +596,15 @@ void cuimoji_ui(cui_ctx *ui) {
                         cui_popover_toggle(ui, "settings");
                     cui_popover(ui, "settings", .placement = CUI_PLACE_TOP_END,
                                 .width = 300, .pad = 12, .gap = 8) {
+                        cui_column(ui, .width = CUI_FILL, .gap = 8, .scroll_y = true,
+                                   .max_height = ui->vh - 140.0f) {
+                        static const char *const themes[] = { "Dark", "Light" };
+                        int th = theme_mode ? 1 : 0;
+                        if (cui_select(ui, "theme", themes, 2, &th,
+                                       .label = "Theme", .width = CUI_FILL)) {
+                            theme_mode = th;
+                            cuimoji_state_save();
+                        }
                         if (cui_select(ui, "emoji-set", font_items, font_count, &font_index,
                                        .label = "Emoji set", .width = CUI_FILL)) {
                             font_pending = true;
@@ -605,10 +630,20 @@ void cuimoji_ui(cui_ctx *ui) {
                         }
                         static const char *const renderers[] = { "Software", "OpenGL", "Vulkan" };
                         int ridx = renderer_mode;
+                        static const char *const delay_items[] = { "0 ms", "10 ms", "20 ms", "40 ms", "60 ms", "100 ms" };
+                        static const int delay_values[] = { 0, 10, 20, 40, 60, 100 };
+                        int dl = 2;
+                        for (int i = 0; i < 6; i++) if (delay_values[i] == paste_delay_ms) dl = i;
+                        if (cui_select(ui, "paste-delay", delay_items, 6, &dl,
+                                       .label = "Paste delay (fallback)", .width = CUI_FILL)) {
+                            paste_delay_ms = delay_values[dl];
+                            cuimoji_state_save();
+                        }
                         if (cui_select(ui, "renderer", renderers, 3, &ridx,
                                        .label = "Renderer", .width = CUI_FILL)) {
                             renderer_mode = ridx;
                             cuimoji_state_save();
+                        }
                         }
                     }
                 }
@@ -648,7 +683,7 @@ int main(void) {
     desc.min_width = 240;
     desc.min_height = 260;
     desc.fixed_size = false;
-    desc.theme = CUI_THEME_DARK;
+    desc.theme = theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK;
     desc.renderer = (renderer_mode == 1 || getenv("CUIMOJI_GL")) ? CUI_RENDERER_OPENGL : CUI_RENDERER_SOFTWARE;
 
     cui_app *app = cui_app_create(&desc);
