@@ -7,6 +7,8 @@ The picker is CUI's searchable emoji grid; cuimoji adds the desktop glue: a
 settings popover, window-backend choices, remembered geometry, and a paste path
 that writes Ctrl+V straight to `/dev/uinput`.
 
+![cuimoji interface](assets/screenshot.png)
+
 ## Features
 
 - **Grid**: recents, nine Unicode groups, skin tones, and search by name.
