@@ -187,8 +187,8 @@ int cuimoji_run_sdl(void) {
     cuimoji_quit_requested = false;
     SDL_StartTextInput();
 
-    int seen_w = 0, seen_h = 0;
-    Uint32 last_resize = 0;
+    int draw_w = 0, draw_h = 0;
+    Uint32 last_draw_ms = 0;
     bool have_frame = false;
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
@@ -202,21 +202,17 @@ int cuimoji_run_sdl(void) {
         if (ww <= 0 || wh <= 0) { SDL_Delay(8); continue; }
 
         Uint32 now_ms = SDL_GetTicks();
-        if (ww != seen_w || wh != seen_h) {
-            seen_w = ww;
-            seen_h = wh;
-            last_resize = now_ms;
-        }
-        /* While the size is changing, commit nothing: the compositor keeps
-         * and scales the last buffer. Intermediate commits are the flash. */
-        if (have_frame && (Uint32)(now_ms - last_resize) < 100) {
+        bool size_diff = (ww != draw_w || wh != draw_h);
+        /* During a drag, draw at most ~30 fps: crisp enough to feel live, and
+         * the compositor scales the last buffer in between. Rendering every
+         * step used to be the heavy part. */
+        if (have_frame && size_diff && (Uint32)(now_ms - last_draw_ms) < 33) {
             last = SDL_GetPerformanceCounter();
             SDL_Delay(2);
             continue;
         }
-        /* Nothing changed: do not render. A software frame of a large grid is
-         * expensive, and doing it 60 times a second made resizing feel heavy. */
-        if (have_frame && !cui_needs_redraw(ui)) {
+        /* Nothing changed: do not render. */
+        if (have_frame && !size_diff && !cui_needs_redraw(ui)) {
             SDL_Delay(8);
             continue;
         }
@@ -243,6 +239,9 @@ int cuimoji_run_sdl(void) {
         wl_surface_commit(surf);
         b->busy = true;
         have_frame = true;
+        draw_w = ww;
+        draw_h = wh;
+        last_draw_ms = now_ms;
         wl_display_flush(wldpy);
     }
 
