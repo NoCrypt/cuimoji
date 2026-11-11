@@ -209,9 +209,15 @@ int cuimoji_run_sdl(void) {
         }
         /* While the size is changing, commit nothing: the compositor keeps
          * and scales the last buffer. Intermediate commits are the flash. */
-        if (have_frame && (Uint32)(now_ms - last_resize) < 150) {
+        if (have_frame && (Uint32)(now_ms - last_resize) < 100) {
             last = SDL_GetPerformanceCounter();
-            SDL_Delay(1);
+            SDL_Delay(2);
+            continue;
+        }
+        /* Nothing changed: do not render. A software frame of a large grid is
+         * expensive, and doing it 60 times a second made resizing feel heavy. */
+        if (have_frame && !cui_needs_redraw(ui)) {
+            SDL_Delay(8);
             continue;
         }
 
