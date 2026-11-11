@@ -65,6 +65,7 @@ bool cui__em_alias_match(const char *emoji, int len, const char *query) {
 
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -73,6 +74,7 @@ bool cui__em_alias_match(const char *emoji, int len, const char *query) {
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -107,7 +109,39 @@ static float footer_y;
 static float footer_h = 34;
 
 bool cuimoji_quit_requested;
+volatile sig_atomic_t cuimoji_toggle_requested;
 void (*cuimoji_hide_window)(void);
+
+static void sig_toggle(int sig) {
+    (void)sig;
+    cuimoji_toggle_requested = 1;
+}
+
+/* One instance only: a second launch just asks the running one to close
+ * (SIGUSR1), which makes Mod+Period a toggle instead of a window farm. */
+static int single_instance(void) {
+    const char *run = getenv("XDG_RUNTIME_DIR");
+    char path[PATH_MAX];
+    snprintf(path, sizeof path, "%s/cuimoji.lock", run && run[0] ? run : "/tmp");
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if (fd < 0) return -1;
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        char buf[32];
+        ssize_t n = pread(fd, buf, sizeof buf - 1, 0);
+        if (n > 0) {
+            buf[n] = 0;
+            pid_t pid = (pid_t)atoi(buf);
+            if (pid > 0) kill(pid, SIGUSR1);
+        }
+        close(fd);
+        return 1;
+    }
+    ftruncate(fd, 0);
+    char buf[32];
+    int n = snprintf(buf, sizeof buf, "%d\n", (int)getpid());
+    if (n > 0) (void)!pwrite(fd, buf, (size_t)n, 0);
+    return fd;
+}
 
 static void x11_hide(void) {
     if (xdpy && xwin) {
@@ -695,8 +729,12 @@ void cuimoji_ui(cui_ctx *ui) {
 
 int main(void) {
     debug_on = getenv("CUIMOJI_DEBUG") != NULL;
+    int lock_fd = single_instance();
+    if (lock_fd == 1) return 0;   /* another instance took over */
+
     cuimoji_state_load();
     cuimoji_fonts_scan();
+    signal(SIGUSR1, sig_toggle);
     uinput_fd = uinput_keyboard_open("cuimoji virtual keyboard");
 
     /* Window system: X11 (through XWayland on a Wayland session), or a
@@ -739,6 +777,7 @@ int main(void) {
     desc.min_width = 240;
     desc.min_height = 260;
     desc.fixed_size = false;
+    desc.hidden = true;   /* we map it ourselves after setting WM_CLASS */
     desc.theme = theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK;
     desc.renderer = (renderer_mode == 1 || getenv("CUIMOJI_GL")) ? CUI_RENDERER_OPENGL : CUI_RENDERER_SOFTWARE;
 
@@ -754,6 +793,15 @@ int main(void) {
         ch.res_name = (char *)"cuimoji";
         ch.res_class = (char *)"cuimoji";
         XSetClassHint(xdpy, xwin, &ch);
+        XSizeHints *hints = XAllocSizeHints();
+        if (hints) {
+            hints->flags = PMinSize;
+            hints->min_width = 240;
+            hints->min_height = 260;
+            XSetWMNormalHints(xdpy, xwin, hints);
+            XFree(hints);
+        }
+        XMapRaised(xdpy, xwin);
         XFlush(xdpy);
     }
 
@@ -761,7 +809,7 @@ int main(void) {
     cuimoji_hide_window = x11_hide;
 
     cuimoji_quit_requested = false;
-    while (cui_app_frame(app) && !cuimoji_quit_requested)
+    while (cui_app_frame(app) && !cuimoji_quit_requested && !cuimoji_toggle_requested)
         cuimoji_ui(cui_app_ui(app));
 
     cuimoji_state_save();

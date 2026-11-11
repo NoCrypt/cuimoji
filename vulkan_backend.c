@@ -61,7 +61,7 @@ int cuimoji_run_vulkan(void) {
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
 
-    while (!cuimoji_quit_requested) {
+    while (!cuimoji_quit_requested && !cuimoji_toggle_requested) {
         if (!cuimoji_sdl_pump(ui)) break;
 
         int ww = 0, wh = 0, pw = 0, ph = 0;

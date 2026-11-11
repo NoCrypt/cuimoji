@@ -3,6 +3,7 @@
 
 #include <cui/cui.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #define CUIMOJI_WIN_W 360
 #define CUIMOJI_WIN_H 480
@@ -11,6 +12,7 @@
 /* Shared between the X11 app loop, the SDL2 software loop and the SDL2
  * Vulkan loop. */
 extern bool cuimoji_quit_requested;
+extern volatile sig_atomic_t cuimoji_toggle_requested;
 extern void (*cuimoji_hide_window)(void);
 
 void cuimoji_state_load(void);

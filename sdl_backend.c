@@ -86,6 +86,9 @@ int cuimoji_run_sdl(void) {
     int pix_w = 0, pix_h = 0;
     SDL_Texture *tex = NULL;
     int tex_w = 0, tex_h = 0;
+    int seen_w = 0, seen_h = 0;
+    Uint32 last_resize = 0;
+    bool have_frame = false;
 
     uint64_t freq = SDL_GetPerformanceFrequency();
     uint64_t last = SDL_GetPerformanceCounter();
@@ -98,6 +101,24 @@ int cuimoji_run_sdl(void) {
         SDL_GetRendererOutputSize(ren, &pw, &ph);
         if (ww <= 0 || wh <= 0 || pw <= 0 || ph <= 0) { SDL_Delay(8); continue; }
 
+        Uint32 now_ms = SDL_GetTicks();
+        if (pw != seen_w || ph != seen_h) {
+            seen_w = pw;
+            seen_h = ph;
+            last_resize = now_ms;
+        }
+        /* While the window keeps changing size, keep showing the last frame
+         * scaled into the new size (linear), instead of reallocating and
+         * re-rendering at every intermediate size. That is what flashes. */
+        if (have_frame && (pw != tex_w || ph != tex_h) &&
+            (Uint32)(now_ms - last_resize) < 150) {
+            SDL_Rect dst = { 0, 0, pw, ph };
+            SDL_RenderCopy(ren, tex, NULL, &dst);
+            SDL_RenderPresent(ren);
+            last = SDL_GetPerformanceCounter();
+            continue;
+        }
+
         if (pw != pix_w || ph != pix_h) {
             unsigned char *n = realloc(pixels, (size_t)pw * (size_t)ph * 4);
             if (!n) { SDL_Delay(8); continue; }
@@ -105,13 +126,12 @@ int cuimoji_run_sdl(void) {
             pix_w = pw;
             pix_h = ph;
         }
-        /* Create the new texture before dropping the old one, and keep
-         * presenting the previous frame (scaled by the compositor) while
-         * there is no texture for the current size: no blank frame. */
+        /* Create the new texture before dropping the old one. */
         if (tex_w != pw || tex_h != ph) {
             SDL_Texture *nt = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
                                                 SDL_TEXTUREACCESS_STREAMING, pw, ph);
             if (!nt) { SDL_Delay(8); continue; }
+            SDL_SetTextureScaleMode(nt, SDL_ScaleModeLinear);
             if (tex) SDL_DestroyTexture(tex);
             tex = nt;
             tex_w = pw;
@@ -140,6 +160,7 @@ int cuimoji_run_sdl(void) {
          * dark flash between resize frames. */
         SDL_RenderCopy(ren, tex, NULL, NULL);
         SDL_RenderPresent(ren);
+        have_frame = true;
     }
 
     SDL_StopTextInput();
