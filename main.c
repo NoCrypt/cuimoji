@@ -30,6 +30,36 @@
 #include "uinput.h"
 #include "cuimoji.h"
 
+#ifdef CUIMOJI_HAVE_EMOJIBASE
+#include "emojibase.h"
+
+static unsigned char alias_lower(unsigned char c) { return c >= 'A' && c <= 'Z' ? (unsigned char)(c + 32) : c; }
+
+/* CUI calls this for names its own matcher missed (the weak default returns
+ * false). All query words must appear somewhere in the Emojibase text. */
+bool cui__em_alias_match(const char *emoji, int len, const char *query) {
+    const char *aliases = cuimoji_alias_lookup(emoji, len);
+    if (!aliases) return false;
+    const char *q = query;
+    while (*q) {
+        while (*q == ' ') q++;
+        if (!*q) break;
+        const char *w = q;
+        while (*q && *q != ' ') q++;
+        int wl = (int)(q - w);
+        bool found = false;
+        for (int i = 0; aliases[i] && !found; i++) {
+            int k = 0;
+            while (k < wl && aliases[i + k] &&
+                   alias_lower((unsigned char)aliases[i + k]) == alias_lower((unsigned char)w[k])) k++;
+            found = k == wl;
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+#endif
+
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
@@ -261,7 +291,7 @@ void cuimoji_state_load(void) {
         } else if (strncmp(line, "emoji_size=", 11) == 0) {
             emoji_size = atoi(line + 11);
             if (emoji_size < 16) emoji_size = 16;
-            if (emoji_size > 48) emoji_size = 48;
+            if (emoji_size > 128) emoji_size = 128;
         } else if (strncmp(line, "ui_scale=", 9) == 0) {
             ui_scale = atoi(line + 9);
             if (ui_scale < 80) ui_scale = 80;
@@ -619,11 +649,10 @@ void cuimoji_ui(cui_ctx *ui) {
                             font_pending = true;
                             cuimoji_state_save();
                         }
-                        double sz = (double)emoji_size;
-                        if (cui_number(ui, "emoji-size", &sz, 16, 48,
-                                       .label = "Emoji size", .step = 2, .suffix = " px",
-                                       .width = CUI_FILL)) {
-                            emoji_size = (int)(sz + 0.5);
+                        float sz = (float)emoji_size;
+                        if (cui_scrub(ui, "Emoji size", &sz, 16, 128,
+                                      .step = 2, .suffix = " px", .width = CUI_FILL)) {
+                            emoji_size = (int)(sz + 0.5f);
                             cuimoji_state_save();
                         }
                         double us = (double)ui_scale;

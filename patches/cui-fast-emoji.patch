@@ -18,7 +18,24 @@
          e->per_row = e->atlas / e->cell;
          e->nslots = CUI_MIN(e->per_row * e->per_row, CUI__EM_SLOTS_MAX);
          memset(e->slots, 0, sizeof e->slots);
-@@ -893,6 +893,14 @@
+@@ -878,6 +878,16 @@
+ }
+ 
+ 
++/* Extra app-provided aliases (Emojibase tags, shortcodes...). The app may
++ * define this strong symbol; the weak default matches nothing. */
++#if defined(__GNUC__)
++__attribute__((weak, noinline))
++#endif
++bool cui__em_alias_match(const char *emoji, int len, const char *query) {
++    (void)emoji; (void)len; (void)query;
++    return false;
++}
++
+ /* every word of the query starts a word of the name */
+ static bool cui__em_match(const char *name, int nlen, const char *q) {
+     while (*q) {
+@@ -893,6 +903,14 @@
              while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
              found = k == wl;
          }
@@ -33,3 +50,20 @@
          if (!found) return false;
      }
      return true;
+@@ -1107,6 +1125,7 @@
+                 const cui__em_rec *rec = &e->recs[i];
+                 const char *name = e->data + rec->name;
+                 bool m = cui__em_match(name, rec->name_len, st->query);
++                if (!m) m = cui__em_alias_match(e->data + rec->text, rec->len, st->query);
+                 if (!m) continue;
+                 size_t ql = strlen(st->query);
+                 bool lead = ql <= rec->name_len;
+@@ -1453,7 +1472,7 @@
+     cui_node *rn = &ui->nodes[row];
+     rn->dir = CUI_ROW; rn->align = CUI_ALIGN_CENTER; rn->w = CUI_FILL; rn->h = CUI_PX(48); rn->gap = 10; rn->pad[1] = rn->pad[3] = 12;
+     cui__open(ui, row);
+-    int show = f->hover >= 0 ? f->hover : st->cur;
++    int show = f->hover;   /* patched: hover only, so the hint shows when idle */
+     if (f->can && show >= 0 && show < st->nitems) {
+         cui__em_str t = cui__em_item_text(f->e, st, f->recent, st->items[show], *f->tone);
+         cui_emoji(ui, t.s, 28);

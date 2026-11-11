@@ -9,8 +9,12 @@ popover, three renderers, and a fast auto-paste path.
 
 ## Features
 
-- **Grid**: recents, nine Unicode groups, skin tones, search by name
-  (substring matches too: "burger" finds "hamburger").
+- **Grid**: recents, nine Unicode groups, skin tones, search by name.
+  Matches are substring-based and also use Emojibase's tags and shortcodes
+  ("burger" and "hungry" find 🍔, "rofl" finds 😆). The data
+  (`emojibase-data@18.0.0/en/compact.json`, MIT) is downloaded at configure
+  and converted to a small lookup table; without it, only CUI's own names
+  are searched.
 - **First focus on the first recent emoji** when the picker opens, so Enter
   picks your most recent emoji. Typing switches to the search field; Down goes
   back into the grid.
@@ -19,7 +23,8 @@ popover, three renderers, and a fast auto-paste path.
   - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
     `F2` cycles sets.
-  - **Emoji size** — number field, step 2 (16-48 px).
+  - **Emoji size** — scrub field (drag sideways, click to type), step 2
+    (16-128 px).
   - **UI size** — number field, step 5 (80-150 %).
   - **Paste delay (fallback)** — number field, step 10 ms (0-500); the wait
     used when niri cannot be asked for the focused window.
@@ -27,8 +32,9 @@ popover, three renderers, and a fast auto-paste path.
   - **Window system** — Auto / Wayland / X11. Auto uses the Wayland-native
     SDL2 window when a Wayland session is available, with the X11 window as
     the fallback. Applied on the next launch.
-- **Bottom bar**: shows the hovered emoji and its name, or `cuimoji <version>`
-  when nothing is hovered, with the settings gear inline.
+- **Bottom bar**: shows the emoji under the pointer and its name; when
+  nothing is hovered it shows `cuimoji <version>` (the keyboard cursor does
+  not keep a name on screen). The settings gear sits inline on the right.
 - **Resizable window**: the grid and the bottom bar follow the size.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no

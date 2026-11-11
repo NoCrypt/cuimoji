@@ -39,6 +39,35 @@ else()
     message(STATUS "cuimoji: SDL2 not found, only the X11 window is built")
 endif()
 
+# Emojibase search aliases (label + tags + emoticon), converted to a small C
+# lookup table at configure time. Skipped when the download or Python is not
+# available; the picker then just uses CUI's own names.
+set(EMOJIBASE_URL "https://cdn.jsdelivr.net/npm/emojibase-data@18.0.0/en/compact.json"
+    CACHE STRING "Emojibase compact.json URL")
+set(EMOJIBASE_JSON "${CMAKE_CURRENT_BINARY_DIR}/emojibase-compact.json")
+if(NOT EXISTS "${EMOJIBASE_JSON}")
+    file(DOWNLOAD "${EMOJIBASE_URL}" "${EMOJIBASE_JSON}" STATUS emojibase_status)
+    if(NOT emojibase_status MATCHES "^0;")
+        message(STATUS "cuimoji: Emojibase download failed (${emojibase_status})")
+        file(REMOVE "${EMOJIBASE_JSON}")
+    endif()
+endif()
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(EXISTS "${EMOJIBASE_JSON}" AND Python3_Interpreter_FOUND)
+    set(EMOJIBASE_C "${CMAKE_CURRENT_BINARY_DIR}/emojibase_aliases.c")
+    add_custom_command(OUTPUT "${EMOJIBASE_C}"
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_aliases.py"
+                "${EMOJIBASE_JSON}" "${EMOJIBASE_C}"
+        DEPENDS "${EMOJIBASE_JSON}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_aliases.py"
+        COMMENT "Generating Emojibase search aliases")
+    list(APPEND CUIMOJI_SOURCES "${EMOJIBASE_C}")
+    add_compile_definitions(CUIMOJI_HAVE_EMOJIBASE=1)
+    message(STATUS "cuimoji: Emojibase search aliases enabled")
+else()
+    message(STATUS "cuimoji: Emojibase search aliases not built")
+endif()
+
 add_executable(cuimoji ${CUIMOJI_SOURCES})
-target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/vulkan)
+target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
+                                           ${CMAKE_CURRENT_SOURCE_DIR}/vulkan)
 target_link_libraries(cuimoji PRIVATE ${CUIMOJI_LIBS})
