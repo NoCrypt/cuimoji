@@ -51,13 +51,14 @@ Mod+Period hotkey-overlay-title="Open cuimoji" { spawn "/home/ncpt/Project/cuimo
 window-rule {
     match app-id=r#"^cuimoji$"#
     open-floating true
-    default-column-width { fixed 520; }
-    default-window-height { fixed 720; }
+    default-column-width { fixed 360; }
+    default-window-height { fixed 480; }
 }
 ```
 
-The rule keeps it floating (it is resizable now, so niri would tile it
-otherwise) with a 520x720 default size.
+The rule keeps it floating (it is resizable, so niri would tile it
+otherwise) and opens it at 360x480, the app's default size. The minimum it
+can be resized to is 240x260.
 
 ## How the paste works
 

@@ -643,8 +643,8 @@ int main(void) {
     cui_app_desc desc;
     memset(&desc, 0, sizeof desc);
     desc.title = "cuimoji";
-    desc.width = WINDOW_W;
-    desc.height = WINDOW_H;
+    desc.width = 360;
+    desc.height = 480;
     desc.min_width = 240;
     desc.min_height = 260;
     desc.fixed_size = false;
