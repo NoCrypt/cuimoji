@@ -8,7 +8,7 @@
 #define CUIMOJI_WIN_W 360
 #define CUIMOJI_WIN_H 480
 #define CUIMOJI_MIN_W 240
-#define CUIMOJI_MIN_H 260
+#define CUIMOJI_MIN_H 240
 #define CUIMOJI_MAX_W 770
 #define CUIMOJI_MAX_H 770
 #define CUIMOJI_VERSION "0.1"
