@@ -645,8 +645,8 @@ int main(void) {
     desc.title = "cuimoji";
     desc.width = WINDOW_W;
     desc.height = WINDOW_H;
-    desc.min_width = 360;
-    desc.min_height = 480;
+    desc.min_width = 240;
+    desc.min_height = 260;
     desc.fixed_size = false;
     desc.theme = CUI_THEME_DARK;
     desc.renderer = (renderer_mode == 1 || getenv("CUIMOJI_GL")) ? CUI_RENDERER_OPENGL : CUI_RENDERER_SOFTWARE;
