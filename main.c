@@ -70,6 +70,7 @@ bool cui__em_alias_match(const char *emoji, int len, const char *query) {
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -329,6 +330,249 @@ static void state_dir(char *out, size_t cap) {
 }
 
 cui_theme_mode cuimoji_theme(void) { return theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK; }
+
+/* ---- theme file -----------------------------------------------------
+ * Optional overrides beside the state file. Every field of cui_theme is
+ * exposed; the file is regenerated (fully commented) when missing, and the
+ * values in it win over the active theme and the Settings. */
+
+typedef struct {
+    const char *name;
+    size_t off;   /* offset of a cui_color inside cui_theme */
+} theme_color_def;
+
+#define THEME_COLOR_OFF(tok) (offsetof(cui_theme, colors) + (size_t)(tok) * sizeof(cui_color))
+
+static const theme_color_def theme_color_defs[] = {
+    { "background", THEME_COLOR_OFF(CUI_TOKEN_BACKGROUND) },
+    { "surface", THEME_COLOR_OFF(CUI_TOKEN_SURFACE) },
+    { "surface_raised", THEME_COLOR_OFF(CUI_TOKEN_SURFACE_RAISED) },
+    { "surface_muted", THEME_COLOR_OFF(CUI_TOKEN_SURFACE_MUTED) },
+    { "foreground", THEME_COLOR_OFF(CUI_TOKEN_FOREGROUND) },
+    { "text_secondary", THEME_COLOR_OFF(CUI_TOKEN_TEXT_SECONDARY) },
+    { "text_muted", THEME_COLOR_OFF(CUI_TOKEN_TEXT_MUTED) },
+    { "border", THEME_COLOR_OFF(CUI_TOKEN_BORDER) },
+    { "border_subtle", THEME_COLOR_OFF(CUI_TOKEN_BORDER_SUBTLE) },
+    { "border_strong", THEME_COLOR_OFF(CUI_TOKEN_BORDER_STRONG) },
+    { "accent", THEME_COLOR_OFF(CUI_TOKEN_ACCENT) },
+    { "accent_strong", THEME_COLOR_OFF(CUI_TOKEN_ACCENT_STRONG) },
+    { "accent_subtle", THEME_COLOR_OFF(CUI_TOKEN_ACCENT_SUBTLE) },
+    { "accent_foreground", THEME_COLOR_OFF(CUI_TOKEN_ACCENT_FOREGROUND) },
+    { "success", THEME_COLOR_OFF(CUI_TOKEN_SUCCESS) },
+    { "warning", THEME_COLOR_OFF(CUI_TOKEN_WARNING) },
+    { "danger", THEME_COLOR_OFF(CUI_TOKEN_DANGER) },
+    { "info", THEME_COLOR_OFF(CUI_TOKEN_INFO) },
+    { "control_on", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_ON) },
+    { "control_glyph", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_GLYPH) },
+    { "control_track", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_TRACK) },
+    { "control_track_hover", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_TRACK_HOVER) },
+    { "control_thumb", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_THUMB) },
+    { "control_thumb_on", THEME_COLOR_OFF(CUI_TOKEN_CONTROL_THUMB_ON) },
+    { "hover", THEME_COLOR_OFF(CUI_TOKEN_HOVER) },
+    { "active", THEME_COLOR_OFF(CUI_TOKEN_ACTIVE) },
+    { "scrim", THEME_COLOR_OFF(CUI_TOKEN_SCRIM) },
+    { "focus_ring", THEME_COLOR_OFF(CUI_TOKEN_FOCUS_RING) },
+    { "series_1", THEME_COLOR_OFF(CUI_TOKEN_SERIES_1) },
+    { "series_2", THEME_COLOR_OFF(CUI_TOKEN_SERIES_2) },
+    { "series_3", THEME_COLOR_OFF(CUI_TOKEN_SERIES_3) },
+    { "series_4", THEME_COLOR_OFF(CUI_TOKEN_SERIES_4) },
+    { "series_5", THEME_COLOR_OFF(CUI_TOKEN_SERIES_5) },
+    { "series_6", THEME_COLOR_OFF(CUI_TOKEN_SERIES_6) },
+    { "tone_sky", offsetof(cui_theme, tone_sky) },
+    { "tone_teal", offsetof(cui_theme, tone_teal) },
+    { "tone_green", offsetof(cui_theme, tone_green) },
+    { "tone_amber", offsetof(cui_theme, tone_amber) },
+    { "tone_rose", offsetof(cui_theme, tone_rose) },
+    { "tone_orchid", offsetof(cui_theme, tone_orchid) },
+    { "tone_violet", offsetof(cui_theme, tone_violet) },
+};
+#define THEME_COLOR_COUNT (sizeof theme_color_defs / sizeof theme_color_defs[0])
+
+typedef struct {
+    const char *name;
+    size_t off;   /* offset of a float inside cui_theme */
+} theme_num_def;
+
+#define THEME_SHADOW_OFF(set, idx, field) \
+    (offsetof(cui_theme, set) + (size_t)(idx) * sizeof(cui_shadow) + offsetof(cui_shadow, field))
+
+static const theme_num_def theme_num_defs[] = {
+    { "radius_control", offsetof(cui_theme, radius_control) },
+    { "radius_panel", offsetof(cui_theme, radius_panel) },
+    { "radius_surface", offsetof(cui_theme, radius_surface) },
+    { "control_sm", offsetof(cui_theme, control_sm) },
+    { "control_md", offsetof(cui_theme, control_md) },
+    { "control_lg", offsetof(cui_theme, control_lg) },
+    { "text_xs", offsetof(cui_theme, text_xs) },
+    { "text_sm", offsetof(cui_theme, text_sm) },
+    { "text_body", offsetof(cui_theme, text_body) },
+    { "text_lg", offsetof(cui_theme, text_lg) },
+    { "heading_1", offsetof(cui_theme, heading) + 0 * sizeof(float) },
+    { "heading_2", offsetof(cui_theme, heading) + 1 * sizeof(float) },
+    { "heading_3", offsetof(cui_theme, heading) + 2 * sizeof(float) },
+    { "heading_4", offsetof(cui_theme, heading) + 3 * sizeof(float) },
+    { "motion", offsetof(cui_theme, motion) },
+    { "font_scale", offsetof(cui_theme, font_scale) },
+    { "shadow_resting_1_y", THEME_SHADOW_OFF(shadow_resting, 0, y) },
+    { "shadow_resting_1_blur", THEME_SHADOW_OFF(shadow_resting, 0, blur) },
+    { "shadow_resting_1_spread", THEME_SHADOW_OFF(shadow_resting, 0, spread) },
+    { "shadow_resting_1_alpha", THEME_SHADOW_OFF(shadow_resting, 0, alpha) },
+    { "shadow_resting_2_y", THEME_SHADOW_OFF(shadow_resting, 1, y) },
+    { "shadow_resting_2_blur", THEME_SHADOW_OFF(shadow_resting, 1, blur) },
+    { "shadow_resting_2_spread", THEME_SHADOW_OFF(shadow_resting, 1, spread) },
+    { "shadow_resting_2_alpha", THEME_SHADOW_OFF(shadow_resting, 1, alpha) },
+    { "shadow_raised_1_y", THEME_SHADOW_OFF(shadow_raised, 0, y) },
+    { "shadow_raised_1_blur", THEME_SHADOW_OFF(shadow_raised, 0, blur) },
+    { "shadow_raised_1_spread", THEME_SHADOW_OFF(shadow_raised, 0, spread) },
+    { "shadow_raised_1_alpha", THEME_SHADOW_OFF(shadow_raised, 0, alpha) },
+    { "shadow_raised_2_y", THEME_SHADOW_OFF(shadow_raised, 1, y) },
+    { "shadow_raised_2_blur", THEME_SHADOW_OFF(shadow_raised, 1, blur) },
+    { "shadow_raised_2_spread", THEME_SHADOW_OFF(shadow_raised, 1, spread) },
+    { "shadow_raised_2_alpha", THEME_SHADOW_OFF(shadow_raised, 1, alpha) },
+    { "shadow_floating_1_y", THEME_SHADOW_OFF(shadow_floating, 0, y) },
+    { "shadow_floating_1_blur", THEME_SHADOW_OFF(shadow_floating, 0, blur) },
+    { "shadow_floating_1_spread", THEME_SHADOW_OFF(shadow_floating, 0, spread) },
+    { "shadow_floating_1_alpha", THEME_SHADOW_OFF(shadow_floating, 0, alpha) },
+    { "shadow_floating_2_y", THEME_SHADOW_OFF(shadow_floating, 1, y) },
+    { "shadow_floating_2_blur", THEME_SHADOW_OFF(shadow_floating, 1, blur) },
+    { "shadow_floating_2_spread", THEME_SHADOW_OFF(shadow_floating, 1, spread) },
+    { "shadow_floating_2_alpha", THEME_SHADOW_OFF(shadow_floating, 1, alpha) },
+};
+#define THEME_NUM_COUNT (sizeof theme_num_defs / sizeof theme_num_defs[0])
+
+static cui_color theme_color_vals[THEME_COLOR_COUNT];
+static uint64_t theme_color_mask;
+static float theme_num_vals[THEME_NUM_COUNT];
+static uint64_t theme_num_mask;
+static bool theme_ready;
+
+static void theme_path(char *out, size_t cap) {
+    char dir[1024];
+    state_dir(dir, sizeof dir);
+    snprintf(out, cap, "%s/theme", dir);
+}
+
+static void theme_write_template(const char *path, const cui_theme *t) {
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fprintf(f,
+            "# cuimoji theme overrides\n"
+            "# Uncomment a line and edit its value. Values here win over the active\n"
+            "# Dark/Light theme and over the Settings. Delete this file to regenerate\n"
+            "# the commented reference values.\n"
+            "#\n"
+            "# Colors are #rrggbb or #rrggbbaa. Sizes are points/pixels, motion and\n"
+            "# font_scale are multipliers. font_scale is applied on top of the\n"
+            "# Settings > Font size value. Changes are read at startup.\n\n"
+            "# --- semantic colors -------------------------------------------\n");
+    for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
+        const cui_color *c = (const cui_color *)((const char *)t + theme_color_defs[i].off);
+        fprintf(f, "# %s = #%02x%02x%02x%02x\n", theme_color_defs[i].name,
+                c->r, c->g, c->b, c->a);
+    }
+    fprintf(f, "\n# --- sizes and metrics -----------------------------------------\n");
+    for (size_t i = 0; i < THEME_NUM_COUNT; i++) {
+        float v = *(const float *)((const char *)t + theme_num_defs[i].off);
+        fprintf(f, "# %s = %g\n", theme_num_defs[i].name, (double)v);
+    }
+    fclose(f);
+}
+
+static char *theme_trim(char *s) {
+    while (*s == ' ' || *s == '\t') s++;
+    char *e = s + strlen(s);
+    while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r' || e[-1] == '\n')) *--e = 0;
+    return s;
+}
+
+static bool theme_parse_color(const char *s, cui_color *out) {
+    if (*s != '#') return false;
+    s++;
+    size_t n = strlen(s);
+    unsigned r, g, b, a = 255;
+    if (n == 6) {
+        if (sscanf(s, "%2x%2x%2x", &r, &g, &b) != 3) return false;
+    } else if (n == 8) {
+        if (sscanf(s, "%2x%2x%2x%2x", &r, &g, &b, &a) != 4) return false;
+    } else {
+        return false;
+    }
+    *out = (cui_color){ (uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a };
+    return true;
+}
+
+static void theme_load(void) {
+    char path[1200];
+    theme_path(path, sizeof path);
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[512];
+    while (fgets(line, sizeof line, f)) {
+        char *s = theme_trim(line);
+        if (!*s || *s == '#') continue;
+        char *eq = strchr(s, '=');
+        if (!eq) {
+            fprintf(stderr, "cuimoji: theme: expected 'key = value': %s\n", s);
+            continue;
+        }
+        *eq = 0;
+        char *key = theme_trim(s);
+        char *val = theme_trim(eq + 1);
+        bool known = false;
+        for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
+            if (strcmp(key, theme_color_defs[i].name) != 0) continue;
+            if (theme_parse_color(val, &theme_color_vals[i]))
+                theme_color_mask |= 1ull << i;
+            else
+                fprintf(stderr, "cuimoji: theme: bad color for %s: %s\n", key, val);
+            known = true;
+            break;
+        }
+        if (known) continue;
+        for (size_t i = 0; i < THEME_NUM_COUNT; i++) {
+            if (strcmp(key, theme_num_defs[i].name) != 0) continue;
+            char *end;
+            float v = strtof(val, &end);
+            if (end != val) {
+                theme_num_vals[i] = v;
+                theme_num_mask |= 1ull << i;
+            } else {
+                fprintf(stderr, "cuimoji: theme: bad number for %s: %s\n", key, val);
+            }
+            known = true;
+            break;
+        }
+        if (!known) fprintf(stderr, "cuimoji: theme: unknown key: %s\n", key);
+    }
+    fclose(f);
+}
+
+static void cuimoji_theme_init(cui_ctx *ui) {
+    char path[1200];
+    theme_path(path, sizeof path);
+    FILE *f = fopen(path, "r");
+    if (f) fclose(f);
+    else theme_write_template(path, cui_theme_get(ui));
+    theme_load();
+}
+
+/* Applied after the theme/font settings each frame so file values win. */
+static void cuimoji_theme_apply(cui_ctx *ui) {
+    if (!theme_color_mask && !theme_num_mask) return;
+    cui_theme *t = cui_theme_get(ui);
+    for (size_t i = 0; i < THEME_COLOR_COUNT; i++)
+        if (theme_color_mask & (1ull << i))
+            *(cui_color *)((char *)t + theme_color_defs[i].off) = theme_color_vals[i];
+    size_t font_scale_off = offsetof(cui_theme, font_scale);
+    for (size_t i = 0; i < THEME_NUM_COUNT; i++) {
+        if (!(theme_num_mask & (1ull << i))) continue;
+        /* font_scale is a multiplier over Settings > Font size */
+        if (theme_num_defs[i].off == font_scale_off)
+            t->font_scale *= theme_num_vals[i];
+        else
+            *(float *)((char *)t + theme_num_defs[i].off) = theme_num_vals[i];
+    }
+}
 
 void cuimoji_state_load(void) {
     char dir[1024], path[1200];
@@ -655,6 +899,10 @@ static bool printable_key_pressed(cui_ctx *ui) {
 }
 
 void cuimoji_ui(cui_ctx *ui) {
+    if (!theme_ready) {
+        cuimoji_theme_init(ui);
+        theme_ready = true;
+    }
 
     if (font_pending) {
         picker_gen++;
@@ -698,6 +946,7 @@ void cuimoji_ui(cui_ctx *ui) {
         static char hint[48];
         snprintf(hint, sizeof hint, "cuimoji %s", CUIMOJI_VERSION);
         ui->theme.font_scale = (float)ui_scale / 100.0f;
+        cuimoji_theme_apply(ui);
         /* The grid view starts below the search row and the group tabs; its
          * y position is the chrome height (they scale with the UI size). */
         cui_rect grid_rect = cui_get_rect(ui, picker_sub_id(ui, "#grid"));
@@ -708,8 +957,7 @@ void cuimoji_ui(cui_ctx *ui) {
         if (grid_h < 40.0f) grid_h = 40.0f;
         footer_y = ui->vh - FOOTER_H;
         footer_h = FOOTER_H;
-        float pad_bottom = (footer_h - 28.0f) * 0.5f;
-        if (pad_bottom < 2.0f) pad_bottom = 2.0f;
+        float pad_bottom = 2.0f;   /* the LG settings button is 44 px */
 
         cui_box(ui, .dir = CUI_STACK, .width = CUI_FILL, .height = CUI_FILL) {
             const char *emoji = cui_emoji_picker(
@@ -740,7 +988,8 @@ void cuimoji_ui(cui_ctx *ui) {
                 cui_row(ui, .width = CUI_FILL, .pad_left = 0, .pad_right = 10,
                         .pad_top = 0, .pad_bottom = pad_bottom, .gap = 8,
                         .align = CUI_ALIGN_CENTER, .justify = CUI_JUSTIFY_END) {
-                    if (cui_icon_button(ui, CUI_ICON_SETTINGS, .size = CUI_SIZE_SM, .tooltip = "Settings") ||
+                    if (cui_icon_button(ui, CUI_ICON_SETTINGS, .size = CUI_SIZE_LG,
+                                        .color = CUI_COLOR_TEXT_MUTED, .tooltip = "Settings") ||
                         cui_key_pressed(ui, CUI_KEY_F1))
                         cui_popover_toggle(ui, "settings");
                     cui_popover(ui, "settings", .placement = CUI_PLACE_TOP_END,
@@ -770,7 +1019,7 @@ void cuimoji_ui(cui_ctx *ui) {
                         }
                         double us = (double)ui_scale;
                         if (cui_number(ui, "ui-size", &us, 80, 150,
-                                       .label = "UI size", .step = 5, .suffix = " %",
+                                       .label = "Font size", .step = 5, .suffix = " %",
                                        .width = CUI_FILL)) {
                             ui_scale = (int)(us + 0.5);
                             cuimoji_state_save();

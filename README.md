@@ -28,7 +28,13 @@ that writes Ctrl+V straight to `/dev/uinput`.
   - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
   - **Emoji size** — number field, step 2 (24–128 px).
-  - **UI size** — number field, step 5 (80–150 %).
+  - **Font size** — number field, step 5 (80–150 %); this is the text scale,
+    not a layout scale.
+  - **Theme file** — `$XDG_STATE_HOME/cuimoji/theme` can override every CUI
+    theme field: all semantic colors, tone colors, radii, control heights,
+    text sizes, headings, shadows, motion, and the font-scale multiplier. It is
+    created commented on first run; delete it to regenerate. Changes apply on
+    the next launch.
   - **Paste delay (fallback)** — number field, step 10 ms (0–500); the wait
     used when the compositor IPC cannot be queried.
   - **Renderer** — Software, OpenGL, Vulkan. Applied on the next launch.
