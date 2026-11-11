@@ -35,7 +35,10 @@ popover, three renderers, and a fast auto-paste path.
 - **Bottom bar**: shows the emoji under the pointer and its name; when
   nothing is hovered it shows `cuimoji <version>` (the keyboard cursor does
   not keep a name on screen). The settings gear sits inline on the right.
-- **Resizable window**: the grid and the bottom bar follow the size.
+- **Resizable window**: the grid and the bottom bar follow the size. The
+  Wayland window presents through double-buffered `wl_shm` buffers, and while
+  the size is changing nothing new is committed, so the compositor scales the
+  last buffer instead of flashing intermediate sizes.
 - **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
   straight to a persistent `/dev/uinput` keyboard. No daemon, no portal, no
   D-Bus round trip. Terminals get Ctrl+Shift+V.
@@ -67,7 +70,6 @@ Mod+Period hotkey-overlay-title="Open cuimoji" { spawn "/home/ncpt/Project/cuimo
 window-rule {
     match app-id=r#"^(cuimoji|CUI)$"#
     open-floating true
-    baba-is-float true
     default-column-width { fixed 360; }
     default-window-height { fixed 480; }
 }
