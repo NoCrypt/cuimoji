@@ -28,7 +28,6 @@ int cuimoji_run_sdl(void) {
     /* no decorations (borderless window) and no GPU surfaces for this UI */
     SDL_SetHint("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0");
     SDL_SetHint("SDL_VIDEO_WAYLAND_PREFER_LIBDECOR", "0");
-    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "cuimoji: SDL_Init: %s\n", SDL_GetError());
