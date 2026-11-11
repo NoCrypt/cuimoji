@@ -66,7 +66,6 @@ static int tone;
 static int renderer_mode;   /* 0 software, 1 OpenGL, 2 Vulkan */
 static int emoji_size = 28;
 static int ui_scale = 100;
-static float last_grid_h = 200.0f;
 static bool initial_focus_done;
 static bool debug_on;
 static int uinput_fd = -1;
@@ -536,12 +535,12 @@ void cuimoji_ui(cui_ctx *ui) {
          * our own 34 px footer instead: "Pick an emoji" on the left, the
          * settings gear on the right, both on the same line. */
         ui->theme.font_scale = (float)ui_scale / 100.0f;
-        cui_rect panel = cui_get_rect(ui, cui_make_id(ui, picker_id));
-        float chrome = (panel.h > 0 && last_grid_h > 10) ? panel.h - last_grid_h : 94.0f;
-        if (chrome < 40.0f) chrome = 94.0f;
+        /* The grid view starts below the search row and the group tabs; its
+         * y position is the chrome height (they scale with the UI size). */
+        cui_rect grid_rect = cui_get_rect(ui, picker_sub_id(ui, "#grid"));
+        float chrome = grid_rect.y > 20.0f ? grid_rect.y : 94.0f;
         float grid_h = ui->vh - FOOTER_H - chrome;
         if (grid_h < 120.0f) grid_h = 120.0f;
-        last_grid_h = grid_h;
         footer_y = ui->vh - FOOTER_H;
         footer_h = FOOTER_H;
         float pad_bottom = (footer_h - 28.0f) * 0.5f;
