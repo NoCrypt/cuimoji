@@ -52,7 +52,9 @@ jobs:
           ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/cuimoji \
             --desktop-file cuimoji.desktop --icon-file cuimoji.png --output appimage
-          mv cuimoji-x86_64.AppImage "dist/cuimoji-${version}-linux-x86_64.AppImage"
+          appimage=$(find . -maxdepth 1 -name 'cuimoji-*-x86_64.AppImage' -print -quit)
+          [ -n "$appimage" ] || { echo "linuxdeploy did not produce an AppImage" >&2; exit 1; }
+          mv "$appimage" "dist/cuimoji-${version}-linux-x86_64.AppImage"
           (cd dist && sha256sum "cuimoji-${version}-linux-x86_64.AppImage" \
              > "cuimoji-${version}-linux-x86_64.AppImage.sha256")
       - uses: actions/upload-artifact@v4
