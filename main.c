@@ -706,11 +706,17 @@ void cuimoji_fonts_scan(void) {
         "/usr/share/fonts/apple-color-emoji/apple-color-emoji.ttf",
         "/usr/share/fonts/truetype/apple-color-emoji/apple-color-emoji.ttf",
         "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+        "/usr/share/fonts/fluent-emoji/FluentEmojiColor.ttf",
+        "/usr/share/fonts/fluent-emoji/FluentEmojiFlat.ttf",
+        "/usr/share/fonts/fluent-emoji/FluentEmojiHighContrast.ttf",
     };
     static const char *const labels[] = {
         "Apple Color Emoji",
         "Apple Color Emoji",
         "Noto Color Emoji",
+        "Fluent Emoji",
+        "Fluent Emoji Flat",
+        "Fluent Emoji High Contrast",
     };
     for (size_t i = 0; i < sizeof known / sizeof known[0]; i++)
         if (access(known[i], R_OK) == 0) add_font(labels[i], known[i]);
