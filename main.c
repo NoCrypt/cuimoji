@@ -614,7 +614,7 @@ void cuimoji_state_load(void) {
             if (emoji_size > 128) emoji_size = 128;
         } else if (strncmp(line, "ui_scale=", 9) == 0) {
             ui_scale = atoi(line + 9);
-            if (ui_scale < 80) ui_scale = 80;
+            if (ui_scale < 90) ui_scale = 90;
             if (ui_scale > 150) ui_scale = 150;
         } else if (strncmp(line, "renderer=", 9) == 0) {
             line[strcspn(line, "\r\n")] = 0;
@@ -1032,7 +1032,7 @@ void cuimoji_ui(cui_ctx *ui) {
                             cuimoji_state_save();
                         }
                         double us = (double)ui_scale;
-                        if (cui_number(ui, "ui-size", &us, 80, 150,
+                        if (cui_number(ui, "ui-size", &us, 90, 150,
                                        .label = "UI size", .step = 5, .suffix = " %",
                                        .width = CUI_FILL)) {
                             ui_scale = (int)(us + 0.5);
