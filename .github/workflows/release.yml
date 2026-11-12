@@ -160,6 +160,8 @@ jobs:
             echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/linux/install.sh | sh"
             echo '```'
             echo
+            echo "The tarball and AppImage need glibc 2.35+; the Arch package is built on Arch."
+            echo
             echo "## Changelog"
             echo
             sed -n "/^## \\[${version}\\]/,/^## \\[/p" CHANGELOG.md | sed '$d'
