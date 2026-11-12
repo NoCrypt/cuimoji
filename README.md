@@ -31,7 +31,25 @@ and has no background service: it only runs while the picker is open.
 - **No daemon, portal, or D-Bus service** — nothing keeps running in the
   background, and no data leaves your machine.
 
-## Build and run
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/NoCrypt/cuimoji/main/linux/install.sh | sh
+```
+
+This installs the latest prebuilt release for your user in
+`~/.local/lib/cuimoji`; no build tools are needed. It adds a `cuimoji` command
+in `~/.local/bin` and an application-menu entry. If SDL2, Wayland, X11, Vulkan,
+or `wl-clipboard` are missing, the script installs the distro packages (it asks
+for your password). The release is for x86_64 Linux with glibc 2.35 or newer.
+
+Uninstall with:
+
+```sh
+~/.local/lib/cuimoji/install.sh --uninstall
+```
+
+## Build from source
 
 You need a C compiler, CMake, `libx11`, and — for the native Wayland window —
 `sdl2` and `wayland-client`. The optional Vulkan renderer needs

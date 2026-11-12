@@ -1095,7 +1095,18 @@ void cuimoji_ui(cui_ctx *ui) {
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0) {
+            printf("cuimoji %s\n", CUIMOJI_VERSION);
+            return 0;
+        }
+        if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            printf("cuimoji %s - emoji picker\n\nUsage: cuimoji [--version]\n"
+                   "Run without arguments to open the picker.\n", CUIMOJI_VERSION);
+            return 0;
+        }
+    }
     debug_on = getenv("CUIMOJI_DEBUG") != NULL;
     int lock_fd = single_instance();
     if (lock_fd == 1) return 0;   /* another instance took over */
