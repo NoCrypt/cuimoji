@@ -189,6 +189,9 @@ int cui__em_alias_score(const char *emoji, int len, const char *query) {
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 #define PICKER_ID "emoji"
 static char picker_id[32] = PICKER_ID;
@@ -574,6 +577,8 @@ static bool theme_window_mask;
 static float theme_num_vals[THEME_NUM_COUNT];
 static uint64_t theme_num_mask;
 static bool theme_ready;
+static double memory_trim_at;
+static bool memory_trimmed;
 
 static void theme_path_for_mode(int mode, char *out, size_t cap) {
     char dir[1024];
@@ -1332,6 +1337,14 @@ static bool printable_key_pressed(cui_ctx *ui) {
 }
 
 void cuimoji_ui(cui_ctx *ui) {
+#if defined(__GLIBC__)
+    /* The first grid fill leaves temporary glyph buffers in glibc's heap. */
+    if (!memory_trim_at) memory_trim_at = now_ms() + 1500.0;
+    if (!memory_trimmed && now_ms() >= memory_trim_at) {
+        malloc_trim(0);
+        memory_trimmed = true;
+    }
+#endif
     cuimoji_ui_zoom = (float)ui_scale / 100.0f;
     if (x11_app && x11_ui_scale != ui_scale) {
         x11_ui_scale = ui_scale;

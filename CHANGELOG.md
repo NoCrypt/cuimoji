@@ -4,6 +4,13 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Lower memory use: the emoji atlas starts at 512² and only grows to 1024²
+  when the viewport or emoji size needs the extra slots; the text atlas starts
+  at 512²; the heap is trimmed once after startup.
+
 ## [0.6] - 2026-11-12
 
 ### Added
