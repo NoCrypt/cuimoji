@@ -19,7 +19,7 @@ All notable changes to cuimoji are recorded here. The format follows
 - Release packages: AppImage, Flatpak bundle, and Arch Linux package.
 
 ### Changed
-- New Smile app icon.
+- New app icon.
 - Emoji font list no longer depends only on a few hardcoded paths.
 
 ## [0.2] - 2026-11-12
