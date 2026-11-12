@@ -45,7 +45,7 @@ All notable changes to cuimoji are recorded here. The format follows
 - Text-presentation symbols ♀, ♂, and ⚕ fall back to a symbol font.
 - Search-field and dropdown outlines match the app chrome.
 
-## [0.1] - 2026-11-11
+## 0.1 - 2026-11-11
 
 - Initial release: CUI emoji grid with recents, groups, search, and skin tones.
 - Native Wayland and X11 windows.
@@ -54,4 +54,3 @@ All notable changes to cuimoji are recorded here. The format follows
 
 [0.3]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.3
 [0.2]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.2
-[0.1]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.1
