@@ -11,7 +11,7 @@
 #define CUIMOJI_MIN_H 240
 #define CUIMOJI_MAX_W 770
 #define CUIMOJI_MAX_H 770
-#define CUIMOJI_VERSION "0.1"
+#define CUIMOJI_VERSION "0.2"
 
 /* Shared between the X11 app loop, the SDL2 software loop and the SDL2
  * Vulkan loop. */
