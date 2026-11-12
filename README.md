@@ -66,12 +66,12 @@ upgrade or remove it.
 
 The [releases page](https://github.com/NoCrypt/cuimoji/releases) also has:
 
-- **AppImage** — `chmod +x cuimoji-0.2-linux-x86_64.AppImage` and run it. It
+- **AppImage** — `chmod +x cuimoji-0.3-linux-x86_64.AppImage` and run it. It
   needs FUSE 2, or run it with `--appimage-extract-and-run`.
-- **Flatpak** — `flatpak install --user cuimoji-0.2-x86_64.flatpak`. This uses
+- **Flatpak** — `flatpak install --user cuimoji-0.3-x86_64.flatpak`. This uses
   the `org.freedesktop.Platform` 25.08 runtime; custom emoji fonts go in
   `~/.local/share/cuimoji/emoji/`.
-- **Arch Linux** — `sudo pacman -U cuimoji-0.2-1-x86_64.pkg.tar.zst`.
+- **Arch Linux** — `sudo pacman -U cuimoji-0.3-1-x86_64.pkg.tar.zst`.
 - **Tarball** — the plain binary, font, icon and installer.
 
 All release builds are for x86_64 Linux.

@@ -1,6 +1,6 @@
 # Maintainer: NoCrypt <https://github.com/NoCrypt>
 pkgname=cuimoji
-pkgver=0.2
+pkgver=0.3
 pkgrel=1
 pkgdesc="A small, fast emoji picker for Linux"
 arch=('x86_64')
