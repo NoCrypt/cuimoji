@@ -1,13 +1,10 @@
 # cuimoji
 
-A small emoji picker for Linux with a native
-[CUI](https://github.com/yappologistic/CUI) interface and fast auto-paste.
-It opens in about 40 ms, uses ~12 MB PSS on Wayland (~8–11 MB on X11), and is a
-single process — no daemon, portal, or D-Bus service.
+A small, fast emoji picker for Linux. Open it with a shortcut, type or click an
+emoji, and cuimoji pastes it into the app you were already using.
 
-The picker is CUI's searchable emoji grid; cuimoji adds the desktop glue: a
-settings popover, window-backend choices, remembered geometry, and a paste path
-that writes Ctrl+V straight to `/dev/uinput`.
+It starts in about 40 ms, uses ~12 MB of memory on Wayland (~8–11 MB on X11),
+and has no background service: it only runs while the picker is open.
 
 <p align="center">
   <img src="assets/screenshot-dark.png" width="49%" alt="cuimoji with the dark theme">
@@ -16,58 +13,29 @@ that writes Ctrl+V straight to `/dev/uinput`.
 
 <p align="center"><em>Dark and light theme, 150% UI size.</em></p>
 
-## Features
+## What you get
 
-- **Grid**: recents, nine Unicode groups with Lucide tab icons, skin tones,
-  and search by name.
-  Matches are substring-based and also use Emojibase's tags and shortcodes
-  ("burger" and "hungry" find 🍔, "rofl" finds 😆). The data
-  (`emojibase-data@18.0.0/en/compact.json`, MIT) is downloaded at configure
-  time and converted to a small lookup table; without it, only CUI's own names
-  are searched.
-- **Keyboard-first**: opens with the cursor on the first recent emoji, so
-  Enter picks your most recent one. Typing switches to the search field; Down
-  goes back into the grid. `Esc` closes, `F1` opens settings, `F2` cycles
-  emoji sets.
-- **Settings** (gear in the bottom bar, or `F1`):
-  - **Theme** — Dark / Light.
-  - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
-    `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
-  - **Emoji size** — number field, step 2 (24–128 px).
-  - **UI size** — number field, step 5 (90–150 %); zooms the whole UI
-    (text, controls, emoji) inside the window.
-  - **Theme file** — `$XDG_STATE_HOME/cuimoji/theme` can override every CUI
-    theme field: all semantic colors, tone colors, radii, control heights,
-    text sizes, headings, shadows, motion, and the font-scale multiplier. It is
-    created commented on first run; delete it to regenerate. Changes apply on
-    the next launch.
-  - **Paste delay (fallback)** — number field, step 10 ms (0–500); the wait
-    used when the compositor IPC cannot be queried.
-  - **Renderer** — Software, OpenGL, Vulkan. Applied on the next launch.
-  - **Window system** — Auto / Wayland / X11. Auto picks the Wayland-native
-    SDL2 window when a Wayland session is available, with the X11 window as
-    the fallback. Applied on the next launch.
-- **Bottom bar**: shows the emoji under the pointer and its name; when nothing
-  is hovered it shows `cuimoji <version>`. The settings gear sits on the right.
-- **Resizable window**: the grid and bottom bar follow the size. Limits are
-  240×240 to 770×770.
-- **Remembered geometry**: window size is restored on both backends; position
-  is restored on X11 (Wayland compositors decide placement).
-- **Lean and instant**: ~40 ms from launch to a visible window and ~12 MB PSS
-  on Wayland (~8–11 MB on X11). No background process: the picker itself is
-  the only thing running.
-- **Fast auto-paste**: the emoji goes to the clipboard and Ctrl+V is written
-  from a persistent `/dev/uinput` keyboard. No daemon, no portal, no D-Bus
-  round trip. Terminals get Ctrl+Shift+V.
-- **Single instance**: launching cuimoji again closes the running picker, so a
-  keybinding toggles it instead of stacking windows.
-- **Idle-friendly**: no frames are drawn while nothing moves; input, resize,
-  animations, and timers wake the loop.
-- Recents, skin tone, emoji font, sizes, theme, paste delay, renderer,
-  window system, and window geometry are saved in
-  `$XDG_STATE_HOME/cuimoji/state`.
+- **Search that understands you** — search by name, tags, or shortcodes:
+  “burger”, “hungry”, and “rofl” all find the right emoji.
+- **Recents and groups** — your most-used emoji are always first; the nine
+  groups (smileys, people, animals, food, places, activities, objects, symbols,
+  flags) have simple icons.
+- **Skin tones** — pick a tone once and the people/hand emoji follow it,
+  including with Apple Color Emoji.
+- **Your own fonts** — use the system emoji font, Apple Color Emoji, or drop a
+  font into `~/.local/share/cuimoji/emoji/`.
+- **Quick paste** — the picker disappears, your previous app gets focus back,
+  and the emoji is pasted. Terminals get Ctrl+Shift+V automatically.
+- **Single instance** — pressing your shortcut again closes the picker instead
+  of opening another window.
+- **No daemon, portal, or D-Bus service** — nothing keeps running in the
+  background, and no data leaves your machine.
 
-## Build
+## Build and run
+
+You need a C compiler, CMake, `libx11`, and — for the native Wayland window —
+`sdl2` and `wayland-client`. The optional Vulkan renderer needs
+`vulkan-headers`.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -75,17 +43,57 @@ cmake --build build -j
 ./build/cuimoji
 ```
 
-Dependencies: `libx11`, and for the Wayland-native window `sdl2` +
-`wayland-client`. The Vulkan renderer additionally needs `vulkan-headers`;
-without SDL2/wayland-client the app builds the X11 window only. CUI v1.2.0 is
-fetched by CMake.
+The first configure downloads CUI (the UI toolkit) and the emoji search data, so
+it needs an internet connection once. Later builds work offline.
 
-CUI is patched by `patches/cui-fast-emoji.patch`: it draws up to 256 new emoji
-per frame and keeps the 1024 texture, so the grid is complete on the first
-frame instead of filling in over ~10 frames; search also falls back to plain
-substring matches.
+For auto-paste, also install `wl-clipboard` (`wl-copy`) and make sure your user
+can open `/dev/uinput` — usually by being in the `input` group. If that is not
+possible, cuimoji falls back to `ydotool` when it is installed.
 
-## Key binding (niri example)
+## Using it
+
+| Key | What it does |
+|---|---|
+| Type | Start searching |
+| ↑ / ↓ / ← / → | Move around the grid |
+| Enter | Pick the selected emoji |
+| Esc | Close without picking |
+| F1 | Open settings |
+| F2 | Switch to the next emoji set |
+
+Or just click an emoji. The bar at the bottom shows the name of the emoji under
+the pointer and has the settings gear on the right.
+
+### Settings
+
+- **Theme** — dark or light.
+- **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any font in
+  `~/.local/share/cuimoji/emoji/`.
+- **Emoji size** — 24–128 px.
+- **UI size** — 90–150%. This zooms the whole interface, including text,
+  controls, and emoji.
+- **Paste delay** — only used when cuimoji cannot ask the compositor which
+  window has focus. The default is fine for most setups.
+- **Renderer** — Software is recommended. OpenGL and Vulkan are available;
+  changes take effect on the next launch.
+- **Window system** — Auto is recommended. Choose X11 if you have trouble with
+  the native Wayland window. Changes take effect on the next launch.
+
+The window can be resized from 240×240 to 770×770, and cuimoji remembers its
+size. On X11 it also remembers where it was.
+
+### Optional: theme file
+
+For deeper customisation, cuimoji creates a commented theme file at
+`$XDG_STATE_HOME/cuimoji/theme`. It can change the semantic colors, tone
+colors, corner radii, control and text sizes, shadows, motion, and the text
+scale. Nothing changes until you uncomment a line. Changes are read on the next
+launch; delete the file to regenerate the reference values.
+
+## Desktop shortcut
+
+Add cuimoji to your compositor or desktop’s keyboard shortcuts. On
+[niri](https://github.com/YaLTeR/niri), for example:
 
 ```kdl
 Mod+Period hotkey-overlay-title="Open cuimoji" { spawn "/path/to/cuimoji/build/cuimoji"; }
@@ -98,47 +106,44 @@ window-rule {
 }
 ```
 
-The rule keeps it floating (it is resizable, so niri would tile it otherwise)
-and gives it the default 360×480 size. The app then restores whatever size it
-had when it last exited. Without niri, no window rule is needed — the app runs
-on X11 or Wayland directly.
+The window rule keeps the picker floating at a useful starting size; cuimoji
+then restores the size you last used. On other desktops, just point a shortcut
+at `build/cuimoji` — no window rule is required.
 
 ## How the paste works
 
-1. The emoji goes to the clipboard: CUI's X11 selection immediately, plus
-   `wl-copy` for the Wayland clipboard (Wayland apps read that one).
-2. The window is hidden so the compositor refocuses the previous window.
-3. The app asks the compositor until focus has left cuimoji instead of
-   sleeping blindly: `niri msg --json focused-window` on niri,
-   `mmsg get focusing-client` on Mango, and `hyprctl activewindow -j` on
-   Hyprland. Without compositor IPC it waits the configured fallback delay.
-4. Ctrl+V is sent from the uinput keyboard opened at startup, with small
-   delays between key events so Qt/Electron apps (Telegram, SereinGram) pick
-   it up reliably.
+1. cuimoji copies the emoji to the clipboard.
+2. It hides itself, so your previous window gets focus back.
+3. It checks with the compositor (niri, Mango, or Hyprland) until that window
+   is focused. On other setups it waits the configured paste delay.
+4. It sends Ctrl+V — or Ctrl+Shift+V in a terminal.
 
-Measured on this machine: ~80 ms from picking to the keypress (software
-renderer; `wl-copy` is most of it, the key itself is instant).
-`CUIMOJI_DEBUG=1` prints the breakdown; `CUIMOJI_GL=1` forces OpenGL.
-Resident memory is ~12 MB PSS on the Wayland window (presentation goes through
-`wl_shm`, so no EGL/GPU driver is mapped) and ~8–11 MB with the X11 window.
+There is no resident helper: the virtual keyboard device is only open while
+cuimoji is running. Picking an emoji and pasting it typically takes under
+100 ms.
 
-## Notes
+## Troubleshooting
 
-- `/dev/uinput` needs the user in the `input` group (as with ydotool); if it
-  cannot be opened, the app falls back to running `ydotool`.
-- `wl-copy` (wl-clipboard) is needed to keep the clipboard after the app exits.
-- Compositor IPC is optional: niri, Mango (`mmsg`) and Hyprland
-  (`hyprctl`) are detected automatically. Without it the app waits a short
-  fixed delay before pasting.
-- `assets/lucide-cuimoji.ttf` is the Lucide subset used by the group tabs
-  (the embedded CUI icons plus the eight group glyphs); CMake copies it next
-  to the binary at build time.
-- The Wayland window uses SDL2 for the surface, input, and IME, and presents
-  CUI's software frame through double-buffered `wl_shm` buffers attached to
-  SDL's surface. The X11 window uses CUI's own window and renderer.
-- `vulkan/cui_vulkan.c`, `vulkan/cui_vulkan.h`, and `vulkan/ui_spv.h` are the
-  small Vulkan renderer scaffold from the CUI mosaic demo
-  (`cui-hello/vulkan`), reused here as the Vulkan backend.
+- **Nothing is pasted** — check that `wl-clipboard` is installed and that you
+  can access `/dev/uinput` (the `input` group). Without that, install `ydotool`.
+- **The picker does not open** — make sure the shortcut points at the actual
+  `build/cuimoji` file.
+- **Wayland behaves oddly** — switch **Window system** to X11 in the settings
+  and restart. Wayland and X11 look the same; X11 goes through XWayland.
+- **Everything is too small or too large** — use **UI size** in the settings.
+
+Your recents, skin tone, theme, sizes, window size, and other choices are saved
+in `$XDG_STATE_HOME/cuimoji/state`.
+
+## For developers
+
+cuimoji is written in C on top of [CUI](https://github.com/yappologistic/CUI).
+CMake fetches CUI v1.2.0 and applies
+[`patches/cui-fast-emoji.patch`](patches/cui-fast-emoji.patch), which makes the
+grid fill on the first frame, adds substring search, and teaches CUI Apple Color
+Emoji’s skin-tone glyph names. The native Wayland window uses SDL2; the X11
+window uses CUI’s own window. `CUIMOJI_DEBUG=1` prints paste timings; on the
+X11 window, `CUIMOJI_GL=1` forces OpenGL.
 
 ## AI disclosure
 
