@@ -67,6 +67,7 @@ bool cui__em_alias_match(const char *emoji, int len, const char *query) {
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -696,7 +697,61 @@ static void add_font(const char *label, const char *path) {
     snprintf(font_labels[font_count], sizeof font_labels[0], "%s", label);
     snprintf(font_paths[font_count], sizeof font_paths[0], "%s", path);
     font_items[font_count] = font_labels[font_count];
+    if (getenv("CUIMOJI_DEBUG")) fprintf(stderr, "cuimoji: font %s = %s\n", label, path);
     font_count++;
+}
+
+/* Optional fontconfig discovery: find the emoji families wherever the distro
+ * installed them, instead of relying on the two or three known paths. The
+ * library is loaded at runtime, so systems without it still work. */
+static void fontconfig_scan(void) {
+    void *lib = dlopen("libfontconfig.so.1", RTLD_LAZY | RTLD_LOCAL);
+    if (!lib) return;
+    int (*fc_init)(void) = (int (*)(void))dlsym(lib, "FcInit");
+    void *(*pattern_create)(void) = (void *(*)(void))dlsym(lib, "FcPatternCreate");
+    void (*pattern_destroy)(void *) = (void (*)(void *))dlsym(lib, "FcPatternDestroy");
+    int (*pattern_add_string)(void *, const char *, const unsigned char *) =
+        (int (*)(void *, const char *, const unsigned char *))dlsym(lib, "FcPatternAddString");
+    int (*config_substitute)(void *, void *, int) =
+        (int (*)(void *, void *, int))dlsym(lib, "FcConfigSubstitute");
+    void (*default_substitute)(void *) = (void (*)(void *))dlsym(lib, "FcDefaultSubstitute");
+    void *(*font_match)(void *, void *, int *) =
+        (void *(*)(void *, void *, int *))dlsym(lib, "FcFontMatch");
+    int (*pattern_get_string)(void *, const char *, int, unsigned char **) =
+        (int (*)(void *, const char *, int, unsigned char **))dlsym(lib, "FcPatternGetString");
+    void *(*config_get_current)(void) = (void *(*)(void))dlsym(lib, "FcConfigGetCurrent");
+    if (!fc_init || !pattern_create || !pattern_destroy || !pattern_add_string ||
+        !config_substitute || !default_substitute || !font_match ||
+        !pattern_get_string || !config_get_current || !fc_init()) {
+        dlclose(lib);
+        return;
+    }
+    void *config = config_get_current();
+    static const char *const families[][2] = {
+        { "Apple Color Emoji", "Apple Color Emoji" },
+        { "Noto Color Emoji", "Noto Color Emoji" },
+        { "Fluent Emoji", "Fluent Emoji" },
+        { "Fluent Emoji Flat", "Fluent Emoji Flat" },
+    };
+    for (size_t i = 0; i < sizeof families / sizeof families[0]; i++) {
+        void *pat = pattern_create();
+        if (!pat) continue;
+        pattern_add_string(pat, "family", (const unsigned char *)families[i][0]);
+        config_substitute(config, pat, 0);   /* FcMatchPattern */
+        default_substitute(pat);
+        int result = 1;   /* FcResultNoMatch */
+        void *match = font_match(config, pat, &result);
+        if (match) {
+            unsigned char *family = NULL, *file = NULL;
+            if (pattern_get_string(match, "family", 0, &family) == 0 && family &&
+                strcasecmp((const char *)family, families[i][0]) == 0 &&
+                pattern_get_string(match, "file", 0, &file) == 0 && file)
+                add_font(families[i][1], (const char *)file);
+            pattern_destroy(match);
+        }
+        pattern_destroy(pat);
+    }
+    dlclose(lib);
 }
 
 void cuimoji_fonts_scan(void) {
@@ -718,6 +773,7 @@ void cuimoji_fonts_scan(void) {
     };
     for (size_t i = 0; i < sizeof known / sizeof known[0]; i++)
         if (access(known[i], R_OK) == 0) add_font(labels[i], known[i]);
+    fontconfig_scan();
 
     char dir[PATH_MAX];
     font_dir(dir, sizeof dir);
