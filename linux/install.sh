@@ -12,9 +12,13 @@ ICON_DIR="$PREFIX/share/icons/hicolor/256x256/apps"
 
 die() { printf 'cuimoji: %s\n' "$*" >&2; exit 1; }
 
-if [ "${1:-}" = "--uninstall" ]; then
+remove_files() {
     rm -f "$BIN_DIR/cuimoji" "$APPS_DIR/cuimoji.desktop" "$ICON_DIR/cuimoji.png"
     rm -rf "$LIB_DIR"
+}
+
+if [ "${1:-}" = "--uninstall" ]; then
+    remove_files
     echo "cuimoji removed."
     exit 0
 fi
@@ -46,6 +50,33 @@ if [ -z "$VERSION" ]; then
 fi
 [ -n "$VERSION" ] || VERSION="$DEFAULT_VERSION"
 VERSION=${VERSION#v}
+
+if [ -e "$LIB_DIR/cuimoji" ] || [ -L "$BIN_DIR/cuimoji" ] || [ -f "$APPS_DIR/cuimoji.desktop" ]; then
+    installed=$("$LIB_DIR/cuimoji" --version 2>/dev/null | sed -n 's/^cuimoji //p' | head -n 1) || true
+    [ -n "$installed" ] || installed="unknown"
+    answer="u"
+    if [ -n "${CUIMOJI_YES:-}" ]; then
+        :
+    elif [ -r /dev/tty ]; then
+        printf '\ncuimoji %s is already installed in %s.\n' "$installed" "$LIB_DIR" >/dev/tty
+        printf '  [u] Upgrade to %s\n  [r] Remove cuimoji\n  [c] Cancel\n' "$VERSION" >/dev/tty
+        printf 'Choose [u/r/c] (u): ' >/dev/tty
+        IFS= read -r answer </dev/tty || answer="u"
+        [ -n "$answer" ] || answer="u"
+    else
+        printf 'cuimoji %s is already installed; upgrading to %s (set CUIMOJI_YES=1 to skip this notice).\n' "$installed" "$VERSION"
+    fi
+    case "$answer" in
+        r|R|remove|uninstall)
+            remove_files
+            echo "cuimoji removed."
+            exit 0 ;;
+        c|C|cancel)
+            echo "Cancelled."
+            exit 0 ;;
+    esac
+fi
+
 TARBALL="cuimoji-$VERSION-linux-$ARCH.tar.gz"
 URL="https://github.com/$REPO/releases/download/v$VERSION/$TARBALL"
 

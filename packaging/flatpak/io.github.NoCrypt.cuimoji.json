@@ -1,0 +1,40 @@
+{
+  "app-id": "io.github.NoCrypt.cuimoji",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "25.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "cuimoji",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=x11",
+    "--device=all",
+    "--filesystem=~/.local/share/cuimoji:create"
+  ],
+  "modules": [
+    {
+      "name": "cuimoji",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -Dm755 cuimoji /app/lib/cuimoji/cuimoji",
+        "install -Dm644 lucide-cuimoji.ttf /app/lib/cuimoji/lucide-cuimoji.ttf",
+        "install -d /app/bin",
+        "ln -s /app/lib/cuimoji/cuimoji /app/bin/cuimoji",
+        "install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/io.github.NoCrypt.cuimoji.png",
+        "install -Dm644 io.github.NoCrypt.cuimoji.desktop /app/share/applications/io.github.NoCrypt.cuimoji.desktop"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/NoCrypt/cuimoji/releases/download/v0.2/cuimoji-0.2-linux-x86_64.tar.gz",
+          "sha256": "325b9eead185adb691b1f05fe0a464dacea74036a52f708316d791d3d5347348",
+          "strip-components": 0
+        },
+        {
+          "type": "file",
+          "path": "io.github.NoCrypt.cuimoji.desktop"
+        }
+      ]
+    }
+  ]
+}

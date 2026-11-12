@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=cuimoji
+GenericName=Emoji Picker
+Comment=Search and paste emoji
+Exec=cuimoji
+Icon=io.github.NoCrypt.cuimoji
+Terminal=false
+Categories=Utility;
+Keywords=emoji;picker;smileys;
+StartupNotify=false

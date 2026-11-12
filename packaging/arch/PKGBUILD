@@ -1,0 +1,43 @@
+# Maintainer: NoCrypt <https://github.com/NoCrypt>
+pkgname=cuimoji
+pkgver=0.2
+pkgrel=1
+pkgdesc="A small, fast emoji picker for Linux"
+arch=('x86_64')
+url="https://github.com/NoCrypt/cuimoji"
+license=('AGPL-3.0-or-later')
+depends=('sdl2' 'wayland' 'libx11' 'vulkan-icd-loader' 'wl-clipboard')
+makedepends=('cmake' 'git' 'python' 'pkgconf' 'vulkan-headers')
+optdepends=('niri: focused-window detection for auto-paste'
+            'ydotool: fallback auto-paste')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('3f77ab4f24ca3375e9112814610d681bc3328340210aaca7a06f6050beb79141')
+
+build() {
+    cmake -S "$pkgname-$pkgver" -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build -j"$(nproc)"
+}
+
+package() {
+    install -Dm755 build/cuimoji "$pkgdir/usr/lib/cuimoji/cuimoji"
+    install -Dm644 build/lucide-cuimoji.ttf "$pkgdir/usr/lib/cuimoji/lucide-cuimoji.ttf"
+    install -Dm644 "$pkgname-$pkgver/assets/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/cuimoji.png"
+    install -Dm644 "$pkgname-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -d "$pkgdir/usr/bin"
+    ln -s /usr/lib/cuimoji/cuimoji "$pkgdir/usr/bin/cuimoji"
+    install -d "$pkgdir/usr/share/applications"
+    cat > "$pkgdir/usr/share/applications/cuimoji.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=cuimoji
+GenericName=Emoji Picker
+Comment=Search and paste emoji
+Exec=cuimoji
+TryExec=cuimoji
+Icon=cuimoji
+Terminal=false
+Categories=Utility;
+Keywords=emoji;picker;smileys;
+StartupNotify=false
+DESKTOP
+}

@@ -49,6 +49,23 @@ Uninstall with:
 ~/.local/lib/cuimoji/install.sh --uninstall
 ```
 
+Running the installer again when cuimoji is already installed asks whether to
+upgrade or remove it.
+
+### Other install options
+
+The [releases page](https://github.com/NoCrypt/cuimoji/releases) also has:
+
+- **AppImage** — `chmod +x cuimoji-0.2-linux-x86_64.AppImage` and run it. It
+  needs FUSE 2, or run it with `--appimage-extract-and-run`.
+- **Flatpak** — `flatpak install --user cuimoji-0.2-x86_64.flatpak`. This uses
+  the `org.freedesktop.Platform` 25.08 runtime; custom emoji fonts go in
+  `~/.local/share/cuimoji/emoji/`.
+- **Arch Linux** — `sudo pacman -U cuimoji-0.2-1-x86_64.pkg.tar.zst`.
+- **Tarball** — the plain binary, font, icon and installer.
+
+All release builds are for x86_64 Linux.
+
 ## Build from source
 
 You need a C compiler, CMake, `libx11`, and — for the native Wayland window —
