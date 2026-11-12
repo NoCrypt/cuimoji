@@ -138,11 +138,14 @@ size. On X11 it also remembers where it was.
 
 ### Optional: theme file
 
-For deeper customisation, cuimoji creates a commented theme file at
-`$XDG_STATE_HOME/cuimoji/theme`. It can change the semantic colors, tone
-colors, corner radii, control and text sizes, shadows, motion, and the text
-scale. Nothing changes until you uncomment a line. Edits are picked up while
-cuimoji runs; delete the file to regenerate the reference values.
+For deeper customisation, cuimoji creates a commented file for each mode:
+`$XDG_STATE_HOME/cuimoji/theme-dark` and `theme-light`. It loads the one that
+matches the **Theme** selected in Settings. Each file can change the semantic
+colors, tone colors, corner radii, control and text sizes, shadows, motion, and
+the text scale. Nothing changes until you uncomment a line. Edits are picked up
+while cuimoji runs; delete the active file to regenerate its reference values.
+An older single `theme` file is moved to the current mode's file on first
+launch.
 
 On the Wayland window, color alpha is composited: set `background =
 #0d111700` to leave the window transparent, and give `surface` an alpha such

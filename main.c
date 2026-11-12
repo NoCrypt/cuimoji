@@ -573,20 +573,30 @@ static float theme_num_vals[THEME_NUM_COUNT];
 static uint64_t theme_num_mask;
 static bool theme_ready;
 
+static void theme_path_for_mode(int mode, char *out, size_t cap) {
+    char dir[1024];
+    state_dir(dir, sizeof dir);
+    snprintf(out, cap, "%s/theme-%s", dir, mode ? "light" : "dark");
+}
+
 static void theme_path(char *out, size_t cap) {
+    theme_path_for_mode(theme_mode, out, cap);
+}
+
+static void theme_legacy_path(char *out, size_t cap) {
     char dir[1024];
     state_dir(dir, sizeof dir);
     snprintf(out, cap, "%s/theme", dir);
 }
 
-static void theme_write_template(const char *path, const cui_theme *t) {
+static void theme_write_template(const char *path, const cui_theme *t, const char *mode_name) {
     FILE *f = fopen(path, "w");
     if (!f) return;
     fprintf(f,
-            "# cuimoji theme overrides\n"
-            "# Uncomment a line and edit its value. Values here win over the active\n"
-            "# Dark/Light theme and over the Settings. Delete this file to regenerate\n"
-            "# the commented reference values.\n"
+            "# cuimoji theme overrides for the %s theme\n"
+            "# Uncomment a line and edit its value. Values here win over this mode's\n"
+            "# theme and over the Settings. Delete this file to regenerate the\n"
+            "# commented reference values.\n"
             "#\n"
             "# Colors are #rrggbb or #rrggbbaa. On the Wayland window the alpha\n"
             "# channel is composited: a transparent background or a translucent\n"
@@ -594,7 +604,7 @@ static void theme_write_template(const char *path, const cui_theme *t) {
             "# The X11 window stays opaque. Sizes are points/pixels, motion and\n"
             "# font_scale are multipliers. font_scale is a text multiplier on\n"
             "# top of the UI size. Changes are picked up while cuimoji runs.\n\n"
-            "# --- semantic colors -------------------------------------------\n");
+            "# --- semantic colors -------------------------------------------\n", mode_name);
     for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
         const cui_color *c = (const cui_color *)((const char *)t + theme_color_defs[i].off);
         fprintf(f, "# %s = #%02x%02x%02x%02x\n", theme_color_defs[i].name,
@@ -683,24 +693,63 @@ static time_t theme_mtime;
 static long theme_nsec;
 static off_t theme_size;
 static double theme_checked;
+static bool theme_need_template;
+static double theme_template_at;
 
-static void cuimoji_theme_init(cui_ctx *ui) {
-    char path[1200];
-    theme_path(path, sizeof path);
-    FILE *f = fopen(path, "r");
-    if (f) fclose(f);
-    else theme_write_template(path, cui_theme_get(ui));
-    theme_load();
+static void theme_stat_track(const char *path) {
     struct stat st;
     if (stat(path, &st) == 0) {
         theme_mtime = st.st_mtime;
         theme_nsec = st.st_mtim.tv_nsec;
         theme_size = st.st_size;
+    } else {
+        theme_mtime = 0;
+        theme_nsec = 0;
+        theme_size = 0;
     }
     theme_checked = now_ms();
 }
 
-/* Pick up edits to the theme file without a restart. */
+static bool theme_copy_file(const char *src, const char *dst) {
+    FILE *in = fopen(src, "r");
+    if (!in) return false;
+    FILE *out = fopen(dst, "w");
+    if (!out) { fclose(in); return false; }
+    char buf[4096];
+    size_t n;
+    bool ok = true;
+    while ((n = fread(buf, 1, sizeof buf, in)) > 0)
+        if (fwrite(buf, 1, n, out) != n) { ok = false; break; }
+    if (ferror(in)) ok = false;
+    if (fclose(in) != 0) ok = false;
+    if (fclose(out) != 0) ok = false;
+    if (!ok) remove(dst);
+    return ok;
+}
+
+static void cuimoji_theme_init(cui_ctx *ui) {
+    char path[1200], legacy[1200];
+    theme_path(path, sizeof path);
+    theme_legacy_path(legacy, sizeof legacy);
+    FILE *f = fopen(path, "r");
+    if (f) {
+        fclose(f);
+    } else {
+        /* Upgrade the pre-split "theme" file to the mode that is active now. */
+        FILE *old = fopen(legacy, "r");
+        if (old) {
+            fclose(old);
+            if (rename(legacy, path) != 0 && !theme_copy_file(legacy, path))
+                theme_write_template(path, cui_theme_get(ui), theme_mode ? "Light" : "Dark");
+        } else {
+            theme_write_template(path, cui_theme_get(ui), theme_mode ? "Light" : "Dark");
+        }
+    }
+    theme_load();
+    theme_stat_track(path);
+}
+
+/* Pick up edits to the active mode's theme file without a restart. */
 static void cuimoji_theme_watch(void) {
     double now = now_ms();
     if (now - theme_checked < 500.0) return;
@@ -708,13 +757,48 @@ static void cuimoji_theme_watch(void) {
     char path[1200];
     theme_path(path, sizeof path);
     struct stat st;
-    if (stat(path, &st) != 0) return;
+    if (stat(path, &st) != 0) {
+        /* The file was removed: drop its overrides and recreate the template. */
+        if (theme_color_mask || theme_num_mask) theme_load();
+        if (!theme_need_template) {
+            theme_need_template = true;
+            theme_template_at = now;
+        }
+        return;
+    }
     if (st.st_mtime == theme_mtime && st.st_mtim.tv_nsec == theme_nsec &&
         st.st_size == theme_size) return;
-    theme_mtime = st.st_mtime;
-    theme_nsec = st.st_mtim.tv_nsec;
-    theme_size = st.st_size;
+    theme_stat_track(path);
     theme_load();
+}
+
+/* Generate a mode's reference file once its theme animation has settled. */
+static void cuimoji_theme_pending(cui_ctx *ui) {
+    if (!theme_need_template) return;
+    if (now_ms() - theme_template_at < 800.0) return;
+    char path[1200];
+    theme_path(path, sizeof path);
+    FILE *f = fopen(path, "r");
+    if (f) fclose(f);
+    else theme_write_template(path, cui_theme_get(ui), theme_mode ? "Light" : "Dark");
+    theme_load();
+    theme_need_template = false;
+    theme_stat_track(path);
+}
+
+static void cuimoji_theme_mode_changed(void) {
+    char path[1200];
+    theme_path(path, sizeof path);
+    FILE *f = fopen(path, "r");
+    if (f) {
+        fclose(f);
+        theme_need_template = false;
+    } else {
+        theme_need_template = true;
+        theme_template_at = now_ms();
+    }
+    theme_load();
+    theme_stat_track(path);
 }
 
 /* Applied after the theme/font settings each frame so file values win. */
@@ -1226,6 +1310,7 @@ void cuimoji_ui(cui_ctx *ui) {
         theme_ready = true;
     }
     cuimoji_theme_watch();
+    cuimoji_theme_pending(ui);
     /* A visible window does not repaint on its own, so wake up now and then
      * to notice theme-file edits. */
     cui_request_wakeup(ui, 1.0f);
@@ -1248,6 +1333,7 @@ void cuimoji_ui(cui_ctx *ui) {
     if (applied_theme != theme_mode) {
         cui_set_theme(ui, theme_mode ? CUI_THEME_LIGHT : CUI_THEME_DARK);
         applied_theme = theme_mode;
+        cuimoji_theme_mode_changed();
     }
 
     if (!initial_focus_done) {

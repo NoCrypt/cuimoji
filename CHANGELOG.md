@@ -12,6 +12,11 @@ All notable changes to cuimoji are recorded here. The format follows
   behind them. Set `background = #rrggbb00` and give `surface` an alpha. The
   X11 window remains opaque.
 
+### Changed
+- Custom theme overrides are split into `theme-dark` and `theme-light` and
+  loaded according to the Theme setting. An old `theme` file is migrated to the
+  active mode's file on first launch.
+
 ## [0.4] - 2026-11-12
 
 ### Added
