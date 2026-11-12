@@ -218,13 +218,18 @@ int cuimoji_run_sdl(void) {
         if (!dirty) {
             float wake = cui_next_wakeup(ui);
             if (wake >= 0) {
-                wake_ms = (int)(wake * 1000.0f);
+                wake_ms = (int)(wake * 1000.0f + 0.5f);
                 if (wake_ms < 0) wake_ms = 0;
             }
         }
+        /* Wait until the CUI timer is due. Capping this at the 200 ms idle
+         * poll would postpone every timer longer than the cap forever. */
         int wait_ms = dirty ? 0 : 200;
-        if (wake_ms >= 0 && wake_ms < wait_ms) wait_ms = wake_ms;
-        bool timer_due = wake_ms >= 0 && wake_ms <= wait_ms;
+        bool timer_due = false;
+        if (wake_ms >= 0) {
+            wait_ms = wake_ms;
+            timer_due = true;
+        }
 
         bool woke = false;
         if (!cuimoji_sdl_pump(ui, wait_ms, &woke)) break;

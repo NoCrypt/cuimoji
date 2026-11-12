@@ -1,6 +1,6 @@
 # Maintainer: NoCrypt <https://github.com/NoCrypt>
 pkgname=cuimoji
-pkgver=0.3
+pkgver=0.4
 pkgrel=1
 pkgdesc="A small, fast emoji picker for Linux"
 arch=('x86_64')
@@ -9,6 +9,8 @@ license=('AGPL-3.0-or-later')
 depends=('sdl2' 'wayland' 'libx11' 'vulkan-icd-loader' 'wl-clipboard')
 makedepends=('cmake' 'git' 'python' 'pkgconf' 'vulkan-headers')
 optdepends=('niri: focused-window detection for auto-paste'
+            'sway: focused-window detection for auto-paste (needs jq)'
+            'jq: needed for Sway focus detection'
             'ydotool: fallback auto-paste')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('a73b4528ea6221ee2bd943c34407a5dae71191b663ff6dc64b28452c8e9b533c')

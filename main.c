@@ -59,6 +59,113 @@ bool cui__em_alias_match(const char *emoji, int len, const char *query) {
     }
     return true;
 }
+
+static void alias_norm(char *dst, size_t cap, const char *src) {
+    size_t n = 0;
+    bool space = false;
+    while (*src && n + 1 < cap) {
+        unsigned char c = (unsigned char)*src++;
+        if (c == '_' || c == '-' || c == ' ' || c == '\t') {
+            if (n) space = true;
+            continue;
+        }
+        if (space && n + 1 < cap) dst[n++] = ' ';
+        space = false;
+        dst[n++] = (char)alias_lower(c);
+    }
+    dst[n] = 0;
+}
+
+/* Levenshtein distance, capped; also treats one adjacent swap as distance 1. */
+static int alias_distance(const char *a, int la, const char *b, int lb, int cap) {
+    if (la > 63 || lb > 63 || abs(la - lb) > cap) return cap + 1;
+    int prev[64], cur[64];
+    for (int j = 0; j <= lb; j++) prev[j] = j;
+    for (int i = 1; i <= la; i++) {
+        cur[0] = i;
+        for (int j = 1; j <= lb; j++) {
+            int cost = a[i - 1] != b[j - 1];
+            int v = prev[j] + 1;
+            if (cur[j - 1] + 1 < v) v = cur[j - 1] + 1;
+            if (prev[j - 1] + cost < v) v = prev[j - 1] + cost;
+            cur[j] = v;
+        }
+        memcpy(prev, cur, sizeof(int) * (size_t)(lb + 1));
+    }
+    int d = prev[lb];
+    if (d == 2 && la == lb) {
+        for (int i = 0; i + 1 < la; i++)
+            if (a[i] == b[i + 1] && a[i + 1] == b[i]) {
+                bool same = true;
+                for (int k = 0; k < la && same; k++)
+                    if (k != i && k != i + 1 && a[k] != b[k]) same = false;
+                if (same) return 1;
+            }
+    }
+    return d;
+}
+
+static int alias_score_text(const char *text, const char *query, bool shortcode) {
+    char full[512];
+    alias_norm(full, sizeof full, text);
+    int ql = (int)strlen(query);
+    if (!full[0] || !ql) return 0;
+    int best = 0;
+    int exact = shortcode ? 1100 : 650;
+    int prefix = shortcode ? 950 : 550;
+    int contains = shortcode ? 800 : 400;
+    int word_exact = shortcode ? 1100 : 600;
+    int word_prefix = shortcode ? 900 : 500;
+    int word_contains = shortcode ? 750 : 350;
+    if (strcmp(full, query) == 0) best = exact;
+    else if (strncmp(full, query, (size_t)ql) == 0) best = prefix;
+    else if (strstr(full, query)) best = contains;
+
+    bool fuzzy = !strchr(query, ' ') && ql >= 3;
+    char work[512];
+    snprintf(work, sizeof work, "%s", full);
+    for (char *tok = work; tok && *tok;) {
+        char *sp = strchr(tok, ' ');
+        if (sp) *sp = 0;
+        int tl = (int)strlen(tok);
+        if (tl) {
+            if (strcmp(tok, query) == 0) { if (word_exact > best) best = word_exact; }
+            else if (strncmp(tok, query, (size_t)(ql < tl ? ql : tl)) == 0 && ql <= tl) {
+                if (word_prefix > best) best = word_prefix;
+            } else if (strstr(tok, query)) { if (word_contains > best) best = word_contains; }
+            if (fuzzy && abs(tl - ql) <= 2) {
+                int cap = ql >= 6 ? 2 : 1;
+                int d = alias_distance(query, ql, tok, tl, cap);
+                if (d == 1) {
+                    int s = shortcode ? 300 : 250;
+                    if (s > best) best = s;
+                } else if (d == 2 && ql >= 6) {
+                    int s = shortcode ? 180 : 150;
+                    if (s > best) best = s;
+                }
+            }
+        }
+        tok = sp ? sp + 1 : NULL;
+    }
+    return best;
+}
+
+/* Strong version of CUI's weak alias-score hook. Shortcodes beat tags, and
+ * single-word typos are accepted at a lower score. */
+int cui__em_alias_score(const char *emoji, int len, const char *query) {
+    char q[128];
+    alias_norm(q, sizeof q, query);
+    if (!q[0]) return 0;
+    int best = 0;
+    const char *shortcodes = cuimoji_shortcode_lookup(emoji, len);
+    if (shortcodes) best = alias_score_text(shortcodes, q, true);
+    const char *aliases = cuimoji_alias_lookup(emoji, len);
+    if (aliases) {
+        int s = alias_score_text(aliases, q, false);
+        if (s > best) best = s;
+    }
+    return best;
+}
 #endif
 
 #include <X11/Xlib.h>
@@ -100,6 +207,7 @@ static int renderer_mode;   /* 0 software, 1 OpenGL, 2 Vulkan */
 static int emoji_size = 28;
 static int ui_scale = 100;
 static int paste_delay_ms = 20;   /* fallback when the compositor cannot be asked */
+static bool paste_after_pick = true;
 static int theme_mode;            /* 0 dark, 1 light */
 static int platform_mode;         /* 0 auto, 1 wayland (SDL2), 2 X11 */
 static bool initial_focus_done;
@@ -218,11 +326,26 @@ static bool json_string(const char *buf, const char *key, char *out, size_t cap)
 /* niri, Mango and Hyprland all export a signature when they run their IPC. */
 static bool have_focus_ipc(void) {
     return getenv("NIRI_SOCKET") || getenv("MANGO_INSTANCE_SIGNATURE") ||
-           getenv("HYPRLAND_INSTANCE_SIGNATURE");
+           getenv("HYPRLAND_INSTANCE_SIGNATURE") || getenv("SWAYSOCK");
 }
 
 static bool focused_app_id(char *out, size_t cap) {
     out[0] = 0;
+    if (getenv("SWAYSOCK")) {
+        FILE *p = popen("swaymsg -t get_tree -r 2>/dev/null | "
+                        "jq -r '.. | objects | select(.focused == true) | "
+                        "(.app_id // .window_properties.class // empty)' 2>/dev/null | "
+                        "head -n 1", "r");
+        if (!p) return false;
+        char buf[512];
+        size_t n = fread(buf, 1, sizeof buf - 1, p);
+        buf[n] = 0;
+        pclose(p);
+        buf[strcspn(buf, "\r\n")] = 0;
+        if (!buf[0]) return false;
+        snprintf(out, cap, "%s", buf);
+        return true;
+    }
     const char *cmd = NULL, *key = NULL;
     if (getenv("NIRI_SOCKET")) {
         cmd = "niri msg --json focused-window 2>/dev/null";
@@ -467,7 +590,7 @@ static void theme_write_template(const char *path, const cui_theme *t) {
             "#\n"
             "# Colors are #rrggbb or #rrggbbaa. Sizes are points/pixels, motion and\n"
             "# font_scale are multipliers. font_scale is a text multiplier on\n"
-            "# top of the UI size. Changes are read at startup.\n\n"
+            "# top of the UI size. Changes are picked up while cuimoji runs.\n\n"
             "# --- semantic colors -------------------------------------------\n");
     for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
         const cui_color *c = (const cui_color *)((const char *)t + theme_color_defs[i].off);
@@ -506,6 +629,8 @@ static bool theme_parse_color(const char *s, cui_color *out) {
 }
 
 static void theme_load(void) {
+    theme_color_mask = 0;
+    theme_num_mask = 0;
     char path[1200];
     theme_path(path, sizeof path);
     FILE *f = fopen(path, "r");
@@ -551,12 +676,41 @@ static void theme_load(void) {
     fclose(f);
 }
 
+static time_t theme_mtime;
+static long theme_nsec;
+static off_t theme_size;
+static double theme_checked;
+
 static void cuimoji_theme_init(cui_ctx *ui) {
     char path[1200];
     theme_path(path, sizeof path);
     FILE *f = fopen(path, "r");
     if (f) fclose(f);
     else theme_write_template(path, cui_theme_get(ui));
+    theme_load();
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        theme_mtime = st.st_mtime;
+        theme_nsec = st.st_mtim.tv_nsec;
+        theme_size = st.st_size;
+    }
+    theme_checked = now_ms();
+}
+
+/* Pick up edits to the theme file without a restart. */
+static void cuimoji_theme_watch(void) {
+    double now = now_ms();
+    if (now - theme_checked < 500.0) return;
+    theme_checked = now;
+    char path[1200];
+    theme_path(path, sizeof path);
+    struct stat st;
+    if (stat(path, &st) != 0) return;
+    if (st.st_mtime == theme_mtime && st.st_mtim.tv_nsec == theme_nsec &&
+        st.st_size == theme_size) return;
+    theme_mtime = st.st_mtime;
+    theme_nsec = st.st_mtim.tv_nsec;
+    theme_size = st.st_size;
     theme_load();
 }
 
@@ -601,6 +755,8 @@ void cuimoji_state_load(void) {
             paste_delay_ms = atoi(line + 12);
             if (paste_delay_ms < 0) paste_delay_ms = 0;
             if (paste_delay_ms > 500) paste_delay_ms = 500;
+        } else if (strncmp(line, "paste=", 6) == 0) {
+            paste_after_pick = atoi(line + 6) != 0;
         } else if (strncmp(line, "platform=", 9) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             if (strcmp(line + 9, "wayland") == 0) platform_mode = 1;
@@ -666,11 +822,12 @@ void cuimoji_state_save(void) {
     if (!f) return;
     fprintf(f,
             "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\npaste_delay=%d\ntheme=%s\n"
-            "platform=%s\nrenderer=%s\n",
+            "platform=%s\nrenderer=%s\npaste=%d\n",
             tone, recent, selected_font, emoji_size, ui_scale, paste_delay_ms,
             theme_mode ? "light" : "dark",
             platform_mode == 1 ? "wayland" : platform_mode == 2 ? "x11" : "auto",
-            renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software");
+            renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software",
+            paste_after_pick ? 1 : 0);
     if (cuimoji_win_w && cuimoji_win_h)
         fprintf(f, "win_w=%d\nwin_h=%d\n", cuimoji_win_w, cuimoji_win_h);
     if (cuimoji_win_pos_valid)
@@ -1009,6 +1166,13 @@ static void do_pick(cui_ctx *ui, const char *emoji) {
     if (cuimoji_hide_window) cuimoji_hide_window();
     double t_unmap = now_ms() - t0;
 
+    if (!paste_after_pick) {
+        /* wl-copy keeps owning the Wayland clipboard after this process exits. */
+        cuimoji_state_save();
+        cuimoji_quit_requested = true;
+        return;
+    }
+
     /* 3. Wait for focus to leave cuimoji; the compositor IPC tells us exactly. */
     double focus_ms = wait_for_focus(paste_target, sizeof paste_target, t0);
     bool shift = is_terminal_app(paste_target);
@@ -1058,6 +1222,10 @@ void cuimoji_ui(cui_ctx *ui) {
         cuimoji_theme_init(ui);
         theme_ready = true;
     }
+    cuimoji_theme_watch();
+    /* A visible window does not repaint on its own, so wake up now and then
+     * to notice theme-file edits. */
+    cui_request_wakeup(ui, 1.0f);
 
     if (font_pending) {
         picker_gen++;
@@ -1161,6 +1329,13 @@ void cuimoji_ui(cui_ctx *ui) {
                                        .label = "Emoji set", .width = CUI_FILL)) {
                             snprintf(selected_font, sizeof selected_font, "%s", font_paths[font_index]);
                             font_pending = true;
+                            cuimoji_state_save();
+                        }
+                        static const char *const paste_items[] = { "On", "Off" };
+                        int paste_choice = paste_after_pick ? 0 : 1;
+                        if (cui_select(ui, "paste-mode", paste_items, 2, &paste_choice,
+                                       .label = "Paste after picking", .width = CUI_FILL)) {
+                            paste_after_pick = paste_choice == 0;
                             cuimoji_state_save();
                         }
                         double sz = (double)emoji_size;

@@ -4,7 +4,18 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
-## 0.4 - 2026-11-12
+## [0.4] - 2026-11-12
+
+### Added
+- Search ranks exact names, name prefixes, exact shortcodes, word starts, tags,
+  and substrings in that order, so `rofl` now finds 🤣 before 😆.
+- Emojibase shortcodes are embedded separately from tags and used for ranking.
+- Single-word typos are tolerated (`smiel`, `brger`); longer queries allow two
+  edits, and adjacent swaps count as one.
+- Sway focus detection (`swaymsg` + `jq`) before pasting.
+- **Paste after picking** dropdown for copy-only use: the emoji stays on
+  the clipboard and the picker closes without sending Ctrl+V.
+- Theme-file edits are picked up while cuimoji runs instead of only at startup.
 
 ### Fixed
 - High-contrast and monochrome emoji bitmaps now follow the theme: grayscale
@@ -59,5 +70,6 @@ All notable changes to cuimoji are recorded here. The format follows
 - Fast auto-paste through `/dev/uinput`, with no daemon or portal.
 - Settings and state persistence.
 
+[0.4]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.4
 [0.3]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.3
 [0.2]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.2

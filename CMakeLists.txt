@@ -50,7 +50,10 @@ endif()
 # available; the picker then just uses CUI's own names.
 set(EMOJIBASE_URL "https://cdn.jsdelivr.net/npm/emojibase-data@18.0.0/en/compact.json"
     CACHE STRING "Emojibase compact.json URL")
+set(EMOJIBASE_SHORTCODES_URL "https://cdn.jsdelivr.net/npm/emojibase-data@18.0.0/en/shortcodes/emojibase.json"
+    CACHE STRING "Emojibase shortcodes URL")
 set(EMOJIBASE_JSON "${CMAKE_CURRENT_BINARY_DIR}/emojibase-compact.json")
+set(EMOJIBASE_SHORTCODES_JSON "${CMAKE_CURRENT_BINARY_DIR}/emojibase-shortcodes.json")
 if(NOT EXISTS "${EMOJIBASE_JSON}")
     file(DOWNLOAD "${EMOJIBASE_URL}" "${EMOJIBASE_JSON}" STATUS emojibase_status)
     if(NOT emojibase_status MATCHES "^0;")
@@ -58,13 +61,21 @@ if(NOT EXISTS "${EMOJIBASE_JSON}")
         file(REMOVE "${EMOJIBASE_JSON}")
     endif()
 endif()
+if(EXISTS "${EMOJIBASE_JSON}" AND NOT EXISTS "${EMOJIBASE_SHORTCODES_JSON}")
+    file(DOWNLOAD "${EMOJIBASE_SHORTCODES_URL}" "${EMOJIBASE_SHORTCODES_JSON}" STATUS shortcodes_status)
+    if(NOT shortcodes_status MATCHES "^0;")
+        message(STATUS "cuimoji: Emojibase shortcodes download failed (${shortcodes_status})")
+        file(WRITE "${EMOJIBASE_SHORTCODES_JSON}" "{}")
+    endif()
+endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(EXISTS "${EMOJIBASE_JSON}" AND Python3_Interpreter_FOUND)
     set(EMOJIBASE_C "${CMAKE_CURRENT_BINARY_DIR}/emojibase_aliases.c")
     add_custom_command(OUTPUT "${EMOJIBASE_C}"
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_aliases.py"
-                "${EMOJIBASE_JSON}" "${EMOJIBASE_C}"
-        DEPENDS "${EMOJIBASE_JSON}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_aliases.py"
+                "${EMOJIBASE_JSON}" "${EMOJIBASE_SHORTCODES_JSON}" "${EMOJIBASE_C}"
+        DEPENDS "${EMOJIBASE_JSON}" "${EMOJIBASE_SHORTCODES_JSON}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_aliases.py"
         COMMENT "Generating Emojibase search aliases")
     list(APPEND CUIMOJI_SOURCES "${EMOJIBASE_C}")
     add_compile_definitions(CUIMOJI_HAVE_EMOJIBASE=1)

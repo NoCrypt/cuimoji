@@ -12,7 +12,7 @@ index c8b8d42..149de99 100644
  CUI_API bool cui_app_is_software(cui_app *app);
  /* HWND, NSWindow*, X11 Window (cast to uintptr_t), SDL_Window* or GLFWwindow*. */
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..e064309 100644
+index c15f341..7b42bca 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -321,7 +321,7 @@ index c15f341..e064309 100644
      px = e->slots[i].px;
      float c = (float)e->cell, A = (float)e->atlas;
      float x = (float)(i % e->per_row) * c + 1, y = (float)(i / e->per_row) * c + 1;
-@@ -878,6 +1074,16 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
+@@ -878,6 +1074,26 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
  }
  
  
@@ -335,10 +335,20 @@ index c15f341..e064309 100644
 +    return false;
 +}
 +
++/* Higher is better. The app can rank shortcodes, tags and fuzzy matches; the
++ * weak default leaves the built-in name matching in charge. */
++#if defined(__GNUC__)
++__attribute__((weak, noinline))
++#endif
++int cui__em_alias_score(const char *emoji, int len, const char *query) {
++    (void)emoji; (void)len; (void)query;
++    return 0;
++}
++
  /* every word of the query starts a word of the name */
  static bool cui__em_match(const char *name, int nlen, const char *q) {
      while (*q) {
-@@ -893,6 +1099,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
+@@ -893,6 +1109,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
              while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
              found = k == wl;
          }
@@ -353,7 +363,7 @@ index c15f341..e064309 100644
          if (!found) return false;
      }
      return true;
-@@ -907,8 +1121,18 @@ enum { CUI__EM_GROUPS = 9, CUI__EM_SECTIONS = CUI__EM_GROUPS + 2 };   /* recent,
+@@ -907,15 +1131,25 @@ enum { CUI__EM_GROUPS = 9, CUI__EM_SECTIONS = CUI__EM_GROUPS + 2 };   /* recent,
  
  static const char *const cui__em_group_names[10] = { "Recent", "Smileys & emotion", "People & body", "Animals & nature", "Food & drink",
                                                        "Travel & places", "Activities", "Objects", "Symbols", "Flags" };
@@ -374,7 +384,28 @@ index c15f341..e064309 100644
  
  typedef struct { int start, count, kind; } cui__em_section;   /* kind: 0 recent, 1..9 a group, 10 results */
  
-@@ -1049,7 +1273,10 @@ static void cui__paint_emoji_grid(cui_ctx *ui, cui_node *n, void *data) {
+ typedef struct {
+     char query[64], built_query[64];
+     int built_tone, built_recent_n; uint32_t built_recent_hash; bool built, built_avail;
+-    int *items; int nitems, cap;           /* >= 0 a list entry, < 0 a recent one: -(k + 1) */
++    int *items; int *scores; int nitems, cap;   /* >= 0 a list entry, < 0 a recent one: -(k + 1) */
+     cui__em_section sec[CUI__EM_SECTIONS]; int nsec;
+     char own_recent[CUI__EM_RECENT_MAX * 32];
+     int own_tone;
+@@ -926,7 +1160,11 @@ typedef struct {
+     int jump;                               /* a tab clicked during a search: its kind + 1 */
+ } cui__em_state;
+ 
+-static void cui__em_state_free(cui_ctx *ui, void *data) { cui__em_state *st = data; cui__free(ui, st->items); st->items = NULL; }
++static void cui__em_state_free(cui_ctx *ui, void *data) {
++    cui__em_state *st = data;
++    cui__free(ui, st->items); st->items = NULL;
++    cui__free(ui, st->scores); st->scores = NULL;
++}
+ 
+ typedef struct {
+     float cell, size, header, pad; int cols;
+@@ -1049,7 +1287,10 @@ static void cui__paint_emoji_grid(cui_ctx *ui, cui_node *n, void *data) {
          if (st_top < r.y) {
              float next = st_top + cui__em_sec_h(g, &g->sec[sticky]);
              float hy = CUI_MIN(r.y, next - g->header);
@@ -386,7 +417,7 @@ index c15f341..e064309 100644
              cui__draw_text_line(ui, CUI_FONT_MEDIUM, hs, r.x + g->pad + 6, hy + (g->header - hs * 1.3f) * 0.5f + 2, p->header, p->names[g->sec[sticky].kind], -1, false);
          }
      }
-@@ -1062,7 +1289,7 @@ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
+@@ -1062,7 +1303,7 @@ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
      cui_rect r = n->rect;
      float side = 18;
      cui_rect d = { r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side };
@@ -395,15 +426,92 @@ index c15f341..e064309 100644
      else cui__em_draw(ui, p->s, p->len, d, p->alpha, NULL);
      if (p->active) cui_draw_rect(ui, (cui_rect){ r.x + 6, r.y + r.h - 2, r.w - 12, 2 }, CUI_CORNERS(1), p->bar);
  }
-@@ -1107,6 +1334,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
-                 const cui__em_rec *rec = &e->recs[i];
-                 const char *name = e->data + rec->name;
-                 bool m = cui__em_match(name, rec->name_len, st->query);
-+                if (!m) m = cui__em_alias_match(e->data + rec->text, rec->len, st->query);
-                 if (!m) continue;
-                 size_t ql = strlen(st->query);
-                 bool lead = ql <= rec->name_len;
-@@ -1344,6 +1572,7 @@ static void cui__em_build_top_row(cui__em_frame *f) {
+@@ -1093,26 +1334,59 @@ static void cui__em_push_recent(char *buf, size_t cap, const char *em) {
+     }
+ }
+ 
++static int cui__em_name_score(const char *name, int nlen, const char *q) {
++    if (!q || !*q) return 0;
++    int ql = (int)strlen(q);
++    bool exact = ql == nlen;
++    bool prefix = ql <= nlen;
++    for (int i = 0; i < ql && (exact || prefix); i++) {
++        unsigned char a = cui__ascii_lower((unsigned char)name[i]);
++        unsigned char b = cui__ascii_lower((unsigned char)q[i]);
++        if (a != b) exact = prefix = false;
++    }
++    if (exact) return 1300;
++    if (prefix) return 1200;
++    if (cui__em_match(name, nlen, q)) return 1000;
++    for (int i = 0; i + ql <= nlen; i++) {
++        int k = 0;
++        while (k < ql && cui__ascii_lower((unsigned char)name[i + k]) ==
++                        cui__ascii_lower((unsigned char)q[k])) k++;
++        if (k == ql) return 900;
++    }
++    return 0;
++}
++
+ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
+     int cap = e->nrec + CUI__EM_RECENT_MAX;
+     st->nitems = 0; st->nsec = 0;
+     if (!st->items || st->cap < cap) return;
+     if (st->query[0]) {
+-        /* results: names that start with the query come first */
++        /* results: exact and prefix matches first, then tags/shortcodes and
++         * finally fuzzy matches. Ties keep the embedded emoji order. */
+         cui__em_section *s = &st->sec[st->nsec++];
+         s->start = 0; s->kind = 10;
+-        for (int pass = 0; pass < 2; pass++)
+-            for (int i = 0; i < e->nrec; i++) {
+-                if (!e->avail[i]) continue;
+-                const cui__em_rec *rec = &e->recs[i];
+-                const char *name = e->data + rec->name;
+-                bool m = cui__em_match(name, rec->name_len, st->query);
+-                if (!m) continue;
+-                size_t ql = strlen(st->query);
+-                bool lead = ql <= rec->name_len;
+-                for (size_t k = 0; k < ql && lead; k++) lead = cui__ascii_lower((unsigned char)name[k]) == cui__ascii_lower((unsigned char)st->query[k]);
+-                if ((pass == 0) == lead) st->items[st->nitems++] = i;
++        for (int i = 0; i < e->nrec; i++) {
++            if (!e->avail[i]) continue;
++            const cui__em_rec *rec = &e->recs[i];
++            int score = cui__em_name_score(e->data + rec->name, rec->name_len, st->query);
++            int as = cui__em_alias_score(e->data + rec->text, rec->len, st->query);
++            if (!as && cui__em_alias_match(e->data + rec->text, rec->len, st->query)) as = 300;
++            if (as > score) score = as;
++            if (!score) continue;
++            st->items[st->nitems] = i;
++            st->scores[st->nitems] = score;
++            st->nitems++;
++        }
++        for (int a = 1; a < st->nitems; a++) {
++            int item = st->items[a], score = st->scores[a], b = a;
++            while (b > 0 && st->scores[b - 1] < score) {
++                st->items[b] = st->items[b - 1];
++                st->scores[b] = st->scores[b - 1];
++                b--;
+             }
++            st->items[b] = item;
++            st->scores[b] = score;
++        }
+         s->count = st->nitems;
+         if (!s->count) st->nsec = 0;
+         return;
+@@ -1186,7 +1460,11 @@ static void cui__em_refresh_list(cui__em_frame *f, uint32_t rhash) {
+     cui__emoji *e = f->e;
+     if (!f->can) { st->nsec = 0; return; }
+     int cap = e->nrec + CUI__EM_RECENT_MAX;
+-    if (!st->items) { st->items = cui__alloc(f->ui, sizeof(int) * (size_t)cap); st->cap = st->items ? cap : 0; }
++    if (!st->items) {
++        st->items = cui__alloc(f->ui, sizeof(int) * (size_t)cap);
++        st->scores = cui__alloc(f->ui, sizeof(int) * (size_t)cap);
++        st->cap = st->items && st->scores ? cap : 0;
++    }
+     if (!st->built || strcmp(st->built_query, st->query) || st->built_recent_hash != rhash || st->built_recent_n != f->nrecent || st->built_avail != e->avail_font) {
+         cui__em_build(e, st, f->nrecent);
+         snprintf(st->built_query, sizeof st->built_query, "%s", st->query);
+@@ -1344,6 +1622,7 @@ static void cui__em_build_top_row(cui__em_frame *f) {
      rn->pad[0] = rn->pad[1] = rn->pad[3] = 10; rn->pad[2] = 6;
      cui__open(ui, row);
      if (st->tone_open) {
@@ -411,7 +519,7 @@ index c15f341..e064309 100644
          for (int k = 0; k < 6; k++) {
              cui_push_id_int(ui, k);
              cui_id tid = cui_make_id(ui, "#tone");
-@@ -1396,7 +1625,7 @@ static void cui__em_build_tabs(cui__em_frame *f) {
+@@ -1396,7 +1675,7 @@ static void cui__em_build_tabs(cui__em_frame *f) {
              else for (int i = 0; i < g->nsec; i++) if (g->sec[i].kind == kind) { st->target = cui__em_sec_top(g, i); st->animating = true; }
          }
          /* the tabs share the width, so a phone fits all ten */
@@ -420,7 +528,7 @@ index c15f341..e064309 100644
          ui->nodes[b].max_w = 40;
          if (ti.hovered) ui->nodes[b].bg = CUI_C(ui, HOVER);
          cui__em_tab_paint *tp = ui->nodes[b].paint_data;
-@@ -1453,7 +1682,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
+@@ -1453,7 +1732,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
      cui_node *rn = &ui->nodes[row];
      rn->dir = CUI_ROW; rn->align = CUI_ALIGN_CENTER; rn->w = CUI_FILL; rn->h = CUI_PX(48); rn->gap = 10; rn->pad[1] = rn->pad[3] = 12;
      cui__open(ui, row);
