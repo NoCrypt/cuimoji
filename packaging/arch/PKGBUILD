@@ -11,7 +11,7 @@ makedepends=('cmake' 'git' 'python' 'pkgconf' 'vulkan-headers')
 optdepends=('niri: focused-window detection for auto-paste'
             'ydotool: fallback auto-paste')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('a73b4528ea6221ee2bd943c34407a5dae71191b663ff6dc64b28452c8e9b533c')
 
 build() {
     cmake -S "$pkgname-$pkgver" -B build -DCMAKE_BUILD_TYPE=Release
