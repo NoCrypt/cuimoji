@@ -1,0 +1,10 @@
+# Regenerate cuimoji's light theme without touching the other Matugen templates.
+#
+#   matugen image ~/Pictures/wallpaper.jpg -m light -c cuimoji-light.toml
+#
+# Copy this file to ~/.config/matugen/cuimoji-light.toml and adjust the paths if
+# you use a non-default XDG_STATE_HOME.
+
+[templates.cuimoji-light]
+input_path = '~/.config/matugen/templates/cuimoji-theme.tmpl'
+output_path = '~/.local/state/cuimoji/theme-light'

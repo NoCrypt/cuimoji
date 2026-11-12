@@ -1,0 +1,10 @@
+# Regenerate cuimoji's dark theme without touching the other Matugen templates.
+#
+#   matugen image ~/Pictures/wallpaper.jpg -m dark -c cuimoji-dark.toml
+#
+# Copy this file to ~/.config/matugen/cuimoji-dark.toml and adjust the paths if
+# you use a non-default XDG_STATE_HOME.
+
+[templates.cuimoji-dark]
+input_path = '~/.config/matugen/templates/cuimoji-theme.tmpl'
+output_path = '~/.local/state/cuimoji/theme-dark'

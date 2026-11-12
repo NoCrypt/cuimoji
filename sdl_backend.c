@@ -269,7 +269,9 @@ int cuimoji_run_sdl(void) {
         if (cuimoji_quit_requested || cuimoji_toggle_requested) break;
 
         const cui_draw_data *dd = cui_get_draw_data(ui);
-        cui_sw_render(sw, dd, b->data, ww, wh, ww * 4, CUI_SW_BGRA);
+        cui_draw_data frame = *dd;
+        frame.clear_color = cuimoji_window_color;
+        cui_sw_render(sw, &frame, b->data, ww, wh, ww * 4, CUI_SW_BGRA);
 
         wl_surface_attach(surf, b->buffer, 0, 0);
         wl_surface_damage(surf, 0, 0, ww, wh);

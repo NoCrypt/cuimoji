@@ -159,9 +159,14 @@ while cuimoji runs; delete the active file to regenerate its reference values.
 An older single `theme` file is moved to the current mode's file on first
 launch.
 
-On the Wayland window, color alpha is composited: set `background =
-#0d111700` to leave the window transparent, and give `surface` an alpha such
-as `#161b22e6` for a see-through panel. The X11 window stays opaque.
+`window` is the clear area behind the rounded panel and is transparent by
+default. `background` is the picker panel itself; `surface` is used for raised
+layers such as popovers. On the Wayland window, alpha is composited: give
+`background` an alpha such as `#161b22e6` for a see-through panel, or set
+`window` to a color for an opaque clear. The X11 window stays opaque.
+
+If you use [Matugen](https://github.com/InioX/matugen), copy-paste templates and
+per-mode configs are in [`contrib/matugen/`](contrib/matugen/).
 
 ## Desktop shortcut
 

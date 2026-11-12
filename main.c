@@ -471,9 +471,8 @@ typedef struct {
 #define THEME_COLOR_OFF(tok) (offsetof(cui_theme, colors) + (size_t)(tok) * sizeof(cui_color))
 
 static const theme_color_def theme_color_defs[] = {
-    { "background", THEME_COLOR_OFF(CUI_TOKEN_BACKGROUND) },
-    { "surface", THEME_COLOR_OFF(CUI_TOKEN_SURFACE) },
-    { "surface_raised", THEME_COLOR_OFF(CUI_TOKEN_SURFACE_RAISED) },
+    { "background", THEME_COLOR_OFF(CUI_TOKEN_SURFACE) },
+    { "surface", THEME_COLOR_OFF(CUI_TOKEN_SURFACE_RAISED) },
     { "surface_muted", THEME_COLOR_OFF(CUI_TOKEN_SURFACE_MUTED) },
     { "foreground", THEME_COLOR_OFF(CUI_TOKEN_FOREGROUND) },
     { "text_secondary", THEME_COLOR_OFF(CUI_TOKEN_TEXT_SECONDARY) },
@@ -569,6 +568,9 @@ static const theme_num_def theme_num_defs[] = {
 
 static cui_color theme_color_vals[THEME_COLOR_COUNT];
 static uint64_t theme_color_mask;
+cui_color cuimoji_window_color = { 0, 0, 0, 0 };
+static cui_color theme_window_val = { 0, 0, 0, 0 };
+static bool theme_window_mask;
 static float theme_num_vals[THEME_NUM_COUNT];
 static uint64_t theme_num_mask;
 static bool theme_ready;
@@ -598,13 +600,16 @@ static void theme_write_template(const char *path, const cui_theme *t, const cha
             "# theme and over the Settings. Delete this file to regenerate the\n"
             "# commented reference values.\n"
             "#\n"
-            "# Colors are #rrggbb or #rrggbbaa. On the Wayland window the alpha\n"
-            "# channel is composited: a transparent background or a translucent\n"
-            "# surface shows the desktop (and compositor blur) behind the picker.\n"
-            "# The X11 window stays opaque. Sizes are points/pixels, motion and\n"
+            "# Colors are #rrggbb or #rrggbbaa. window is the clear area behind the\n"
+            "# rounded panel; background is the panel itself; surface is raised\n"
+            "# layers such as popovers. On the Wayland window alpha is composited;\n"
+            "# the X11 window stays opaque. Sizes are points/pixels, motion and\n"
             "# font_scale are multipliers. font_scale is a text multiplier on\n"
             "# top of the UI size. Changes are picked up while cuimoji runs.\n\n"
             "# --- semantic colors -------------------------------------------\n", mode_name);
+    fprintf(f, "# window = #%02x%02x%02x%02x\n",
+            cuimoji_window_color.r, cuimoji_window_color.g,
+            cuimoji_window_color.b, cuimoji_window_color.a);
     for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
         const cui_color *c = (const cui_color *)((const char *)t + theme_color_defs[i].off);
         fprintf(f, "# %s = #%02x%02x%02x%02x\n", theme_color_defs[i].name,
@@ -644,6 +649,8 @@ static bool theme_parse_color(const char *s, cui_color *out) {
 static void theme_load(void) {
     theme_color_mask = 0;
     theme_num_mask = 0;
+    theme_window_mask = false;
+    theme_window_val = (cui_color){ 0, 0, 0, 0 };
     char path[1200];
     theme_path(path, sizeof path);
     FILE *f = fopen(path, "r");
@@ -660,6 +667,11 @@ static void theme_load(void) {
         *eq = 0;
         char *key = theme_trim(s);
         char *val = theme_trim(eq + 1);
+        if (strcmp(key, "window") == 0) {
+            if (theme_parse_color(val, &theme_window_val)) theme_window_mask = true;
+            else fprintf(stderr, "cuimoji: theme: bad color for %s: %s\n", key, val);
+            continue;
+        }
         bool known = false;
         for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
             if (strcmp(key, theme_color_defs[i].name) != 0) continue;
@@ -801,13 +813,33 @@ static void cuimoji_theme_mode_changed(void) {
     theme_stat_track(path);
 }
 
+static int theme_color_index(const char *name) {
+    for (size_t i = 0; i < THEME_COLOR_COUNT; i++)
+        if (strcmp(theme_color_defs[i].name, name) == 0) return (int)i;
+    return -1;
+}
+
 /* Applied after the theme/font settings each frame so file values win. */
 static void cuimoji_theme_apply(cui_ctx *ui) {
+    cuimoji_window_color = theme_window_mask ? theme_window_val : (cui_color){ 0, 0, 0, 0 };
     if (!theme_color_mask && !theme_num_mask) return;
     cui_theme *t = cui_theme_get(ui);
     for (size_t i = 0; i < THEME_COLOR_COUNT; i++)
         if (theme_color_mask & (1ull << i))
             *(cui_color *)((char *)t + theme_color_defs[i].off) = theme_color_vals[i];
+
+    /* CUI's BACKGROUND is also the opaque foreground used on the neutral
+     * accent and in colour mixes. Keep it opaque; translucency belongs to
+     * the panel (SURFACE) and the window clear (window). */
+    int bg = theme_color_index("background");
+    if (bg >= 0 && (theme_color_mask & (1ull << bg))) {
+        t->colors[CUI_TOKEN_BACKGROUND] = t->colors[CUI_TOKEN_SURFACE];
+        t->colors[CUI_TOKEN_BACKGROUND].a = 255;
+        int af = theme_color_index("accent_foreground");
+        if (af < 0 || !(theme_color_mask & (1ull << af)))
+            t->colors[CUI_TOKEN_ACCENT_FOREGROUND] = t->colors[CUI_TOKEN_BACKGROUND];
+    }
+
     size_t font_scale_off = offsetof(cui_theme, font_scale);
     for (size_t i = 0; i < THEME_NUM_COUNT; i++) {
         if (!(theme_num_mask & (1ull << i))) continue;

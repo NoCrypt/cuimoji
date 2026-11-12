@@ -4,6 +4,16 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Matugen template and separate dark/light configs under `contrib/matugen/`.
+
+### Changed
+- Theme token remap (breaking): `background` is now the picker panel,
+  `surface` is the raised layer, and the new `window` token is the clear area
+  behind the panel (transparent by default). The `surface_raised` key is gone.
+
 ## [0.5] - 2026-11-12
 
 ### Added

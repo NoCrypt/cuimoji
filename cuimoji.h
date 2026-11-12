@@ -25,6 +25,9 @@ extern int cuimoji_win_w, cuimoji_win_h, cuimoji_win_x, cuimoji_win_y;
 extern bool cuimoji_win_pos_valid;
 /* UI size: the logical->physical zoom used by the SDL backends. */
 extern float cuimoji_ui_zoom;
+/* Clear colour behind the rounded panel, from the theme's "window" token.
+ * Transparent by default; the window surface is ARGB on Wayland. */
+extern cui_color cuimoji_window_color;
 
 void cuimoji_state_load(void);
 void cuimoji_state_save(void);
