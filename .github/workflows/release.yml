@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  linux:
+    name: Tarball and AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsdl2-dev libwayland-dev \
+            libx11-dev libvulkan-dev python3 wget file
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j"$(nproc)"
+      - name: Tarball
+        run: |
+          version="${VERSION#v}"
+          mkdir -p dist stage
+          cp build/cuimoji build/lucide-cuimoji.ttf assets/icon.png \
+             linux/install.sh LICENSE README.md stage/
+          chmod 755 stage/cuimoji stage/install.sh
+          chmod 644 stage/lucide-cuimoji.ttf stage/icon.png stage/LICENSE stage/README.md
+          tar -czf "dist/cuimoji-${version}-linux-x86_64.tar.gz" -C stage .
+          (cd dist && sha256sum "cuimoji-${version}-linux-x86_64.tar.gz" \
+             > "cuimoji-${version}-linux-x86_64.tar.gz.sha256")
+      - name: AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          version="${VERSION#v}"
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          mkdir -p AppDir/usr/bin
+          cp build/cuimoji AppDir/usr/bin/cuimoji
+          cp build/lucide-cuimoji.ttf AppDir/usr/bin/lucide-cuimoji.ttf
+          cp packaging/flatpak/io.github.NoCrypt.cuimoji.desktop cuimoji.desktop
+          sed -i 's|^Icon=.*|Icon=cuimoji|' cuimoji.desktop
+          cp assets/icon.png cuimoji.png
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            --executable AppDir/usr/bin/cuimoji \
+            --desktop-file cuimoji.desktop --icon-file cuimoji.png --output appimage
+          mv cuimoji-x86_64.AppImage "dist/cuimoji-${version}-linux-x86_64.AppImage"
+          (cd dist && sha256sum "cuimoji-${version}-linux-x86_64.AppImage" \
+             > "cuimoji-${version}-linux-x86_64.AppImage.sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  arch:
+    name: Arch package
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel cmake git python pkgconf sdl2 wayland \
+            libx11 vulkan-icd-loader vulkan-headers wl-clipboard curl
+      - name: Build package
+        run: |
+          version="${VERSION#v}"
+          sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
+          sha=$(curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${VERSION}.tar.gz" \
+                 | sha256sum | cut -d' ' -f1)
+          sed -i "s/^sha256sums=.*/sha256sums=('${sha}')/" packaging/arch/PKGBUILD
+          useradd -m builder
+          chown -R builder packaging/arch
+          cd packaging/arch
+          su builder -c 'makepkg -f --noconfirm'
+          mkdir -p ../../dist
+          cp cuimoji-*.pkg.tar.zst ../../dist/
+          cd ../../dist
+          sha256sum cuimoji-*.pkg.tar.zst > cuimoji-${version}-1-x86_64.pkg.tar.zst.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch
+          path: dist/*
+
+  flatpak:
+    name: Flatpak bundle
+    runs-on: ubuntu-24.04
+    needs: linux
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: dist
+      - name: Build bundle
+        run: |
+          version="${VERSION#v}"
+          python3 - <<'EOF'
+          import json, os
+          path = 'packaging/flatpak/io.github.NoCrypt.cuimoji.json'
+          m = json.load(open(path))
+          version = os.environ['VERSION'].lstrip('v')
+          tar = os.path.abspath(f'dist/cuimoji-{version}-linux-x86_64.tar.gz')
+          m['modules'][0]['sources'][0] = {
+              'type': 'archive', 'path': tar, 'strip-components': 0,
+          }
+          m['modules'][0]['sources'][1] = {
+              'type': 'file',
+              'path': os.path.abspath('packaging/flatpak/io.github.NoCrypt.cuimoji.desktop'),
+          }
+          json.dump(m, open('flatpak-manifest.json', 'w'), indent=2)
+          EOF
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --state-dir="$PWD/.flatpak-builder" --repo="$PWD/flatpak-repo" \
+            build-dir flatpak-manifest.json
+          flatpak build-bundle flatpak-repo "dist/cuimoji-${version}-x86_64.flatpak" \
+            io.github.NoCrypt.cuimoji master
+          (cd dist && sha256sum "cuimoji-${version}-x86_64.flatpak" \
+             > "cuimoji-${version}-x86_64.flatpak.sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: dist/*
+
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [linux, arch, flatpak]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${VERSION#v}"
+          {
+            echo "cuimoji ${version} — a small, fast emoji picker for Linux."
+            echo
+            echo "## Install"
+            echo
+            echo '```sh'
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/linux/install.sh | sh"
+            echo '```'
+            echo
+            echo "## Changelog"
+            echo
+            sed -n "/^## \\[${version}\\]/,/^## \\[/p" CHANGELOG.md | sed '$d'
+          } > release-notes.md
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/* --clobber
+          else
+            gh release create "$VERSION" dist/* \
+              --title "cuimoji ${version}" --notes-file release-notes.md
+          fi
