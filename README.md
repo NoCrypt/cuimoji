@@ -112,10 +112,11 @@ the pointer and has the settings gear on the right.
 ### Settings
 
 - **Theme** — dark or light.
-- **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, Fluent Emoji,
-  or any other installed emoji font (One UI Emoji, OpenMoji, Twemoji,
-  JoyPixels, …) found through fontconfig. You can also drop a font into
-  `~/.local/share/cuimoji/emoji/`.
+- **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, Fluent Emoji
+  (Color, Flat, or High Contrast), or any other installed emoji font (One UI
+  Emoji, OpenMoji, Twemoji, JoyPixels, …) found through fontconfig. Monochrome
+  emoji fonts are drawn in the current text color. You can also drop a font
+  into `~/.local/share/cuimoji/emoji/`.
 - **Emoji size** — 24–128 px.
 - **UI size** — 90–150%. This zooms the whole interface, including text,
   controls, and emoji.

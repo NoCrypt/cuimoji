@@ -797,7 +797,6 @@ static void fontconfig_scan(void) {
                     bool name_emoji = strcasestr((const char *)family, "emoji") ||
                                       strcasestr((const char *)family, "moji");
                     if (!has_emoji || (!color && !name_emoji)) continue;
-                    if (strcasestr((const char *)family, "high contrast")) continue;
                     if (font_label_exists((const char *)family)) continue;
                     add_font((const char *)family, (const char *)file);
                 }
@@ -819,6 +818,7 @@ void cuimoji_fonts_scan(void) {
         "/usr/share/fonts/noto/NotoColorEmoji.ttf",
         "/usr/share/fonts/fluent-emoji/FluentEmojiColor.ttf",
         "/usr/share/fonts/fluent-emoji/FluentEmojiFlat.ttf",
+        "/usr/share/fonts/fluent-emoji/FluentEmojiHighContrast.ttf",
     };
     static const char *const labels[] = {
         "Apple Color Emoji",
@@ -826,6 +826,7 @@ void cuimoji_fonts_scan(void) {
         "Noto Color Emoji",
         "Fluent Emoji",
         "Fluent Emoji Flat",
+        "Fluent Emoji High Contrast",
     };
     for (size_t i = 0; i < sizeof known / sizeof known[0]; i++)
         if (access(known[i], R_OK) == 0) add_font(labels[i], known[i]);
