@@ -11,6 +11,9 @@ All notable changes to cuimoji are recorded here. The format follows
   when the viewport or emoji size needs the extra slots; the text atlas starts
   at 512²; the heap is trimmed once after startup.
 
+### Fixed
+- The tone-selector hand no longer disappears at the lowest UI size.
+
 ## [0.6] - 2026-11-12
 
 ### Added

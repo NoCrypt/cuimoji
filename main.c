@@ -1230,6 +1230,10 @@ static void overlay_emoji(cui_ctx *ui, cui_id id, const char *emoji) {
     cui_rect r = cui_get_rect(ui, id);
     if (r.w <= 0 || r.h <= 0) return;
     float side = ICON_OVERLAY_PX;
+    /* Keep the small overlay icons at least 22 physical pixels: some colour
+     * fonts have no usable bitmap strike for the 16-20 px sizes. */
+    if (cuimoji_ui_zoom > 0.01f && side * cuimoji_ui_zoom < 22.0f)
+        side = 22.0f / cuimoji_ui_zoom;
     cui_rect d = { r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side };
     cui_draw_emoji(ui, emoji, -1, d);
 }
