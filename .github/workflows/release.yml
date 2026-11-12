@@ -84,9 +84,10 @@ jobs:
           cd packaging/arch
           su builder -c 'makepkg -f --noconfirm'
           mkdir -p ../../dist
-          cp cuimoji-*.pkg.tar.zst ../../dist/
+          cp "cuimoji-${version}-1-x86_64.pkg.tar.zst" ../../dist/
           cd ../../dist
-          sha256sum cuimoji-*.pkg.tar.zst > cuimoji-${version}-1-x86_64.pkg.tar.zst.sha256
+          sha256sum "cuimoji-${version}-1-x86_64.pkg.tar.zst" \
+            > "cuimoji-${version}-1-x86_64.pkg.tar.zst.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: arch
