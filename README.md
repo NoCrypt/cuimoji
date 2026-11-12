@@ -13,8 +13,9 @@
 A small, fast emoji picker for Linux. Open it with a shortcut, type or click an
 emoji, and cuimoji pastes it into the app you were already using.
 
-It starts in about 40 ms, uses ~12 MB of memory on Wayland (~8–11 MB on X11),
-and has no background service: it only runs while the picker is open.
+It starts in about 40 ms and has no background service: it only runs while the
+picker is open. With the picker open it uses about 15 MiB PSS (21 MiB RSS) on
+Wayland. See [BENCHMARK.md](BENCHMARK.md) for the measured comparison.
 
 <p align="center">
   <img src="assets/screenshot-dark.png" width="49%" alt="cuimoji with the dark theme">
@@ -41,6 +42,17 @@ and has no background service: it only runs while the picker is open.
   of opening another window.
 - **No daemon, portal, or D-Bus service** — nothing keeps running in the
   background, and no data leaves your machine.
+
+## Benchmark
+
+**The lightest grid-based emoji picker tested:** ~15 MiB PSS (21 MiB RSS) open,
+0 MiB idle, 1.3 MiB binary. That is about 13× less RAM and 6–12× smaller than
+Smile/Emote, with no daemon. Text-only launchers such as fuzzel and bemenu can
+go slightly lower (8.5–11.4 MiB), but they are plain lists — cuimoji gives you a
+full emoji grid for roughly the same RAM as fuzzel's text menu.
+
+Measured against rofi-emoji, fuzzel, rofimoji, wofi-emoji, bemoji, Smile, and
+Emote on Wayland. Full results and methodology: [BENCHMARK.md](BENCHMARK.md).
 
 ## Install
 
@@ -219,6 +231,19 @@ This project was developed with substantial assistance from an AI coding agent
 (OpenCode with DeepSeek V4.1 Flash). The human author directed the work,
 tested the app, and reviewed the changes. Code and documentation may contain
 AI-generated material; review it before reuse.
+
+## Acknowledgements
+
+cuimoji is built on [CUI](https://github.com/yappologistic/CUI) and uses
+[Emojibase](https://github.com/milesj/emojibase) for search data. Thanks to the
+emoji pickers that came before and that were measured in
+[BENCHMARK.md](BENCHMARK.md): [rofi-emoji](https://github.com/Mange/rofi-emoji),
+[rofimoji](https://github.com/fdw/rofimoji),
+[wofi-emoji](https://github.com/Zeioth/wofi-emoji),
+[bemoji](https://github.com/marty-oehme/bemoji),
+[fuzzel](https://codeberg.org/dnkl/fuzzel),
+[Smile](https://github.com/mijorus/smile), and
+[Emote](https://github.com/tom-james-watson/Emote).
 
 ## License
 
