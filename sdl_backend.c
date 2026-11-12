@@ -273,6 +273,10 @@ int cuimoji_run_sdl(void) {
 
         wl_surface_attach(surf, b->buffer, 0, 0);
         wl_surface_damage(surf, 0, 0, ww, wh);
+        /* SDL sets an opaque region again when the window is resized.
+         * Re-assert translucency on every frame so resizing cannot make the
+         * ARGB buffer opaque. */
+        wl_surface_set_opaque_region(surf, NULL);
         wl_surface_commit(surf);
         b->busy = true;
         have_frame = true;
