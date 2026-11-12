@@ -4,6 +4,13 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
+## 0.4 - 2026-11-12
+
+### Fixed
+- High-contrast and monochrome emoji bitmaps now follow the theme: grayscale
+  glyphs are drawn in the current text color, so Fluent Emoji High Contrast is
+  readable in both dark and light mode.
+
 ## [0.3] - 2026-11-12
 
 ### Added
