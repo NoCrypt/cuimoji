@@ -14,7 +14,7 @@ A small, fast emoji picker for Linux. Open it with a shortcut, type or click an
 emoji, and cuimoji pastes it into the app you were already using.
 
 It starts in about 40 ms and has no background service: it only runs while the
-picker is open. With the picker open it uses about 15 MiB PSS (21 MiB RSS) on
+picker is open. With the picker open it uses about 9 MiB PSS (16 MiB RSS) on
 Wayland. See [BENCHMARK.md](BENCHMARK.md) for the measured comparison.
 
 <p align="center">
@@ -45,11 +45,11 @@ Wayland. See [BENCHMARK.md](BENCHMARK.md) for the measured comparison.
 
 ## Benchmark
 
-**The lightest grid-based emoji picker tested:** ~15 MiB PSS (21 MiB RSS) open,
-0 MiB idle, 1.3 MiB binary. That is about 13× less RAM and 6–12× smaller than
-Smile/Emote, with no daemon. Text-only launchers such as fuzzel and bemenu can
-go slightly lower (8.5–11.4 MiB), but they are plain lists — cuimoji gives you a
-full emoji grid for roughly the same RAM as fuzzel's text menu.
+**The lightest grid-based emoji picker tested:** ~9 MiB PSS (16 MiB RSS) open,
+0 MiB idle, 1.2 MiB binary. That is about 21× less RAM and 7–12× smaller than
+Smile/Emote, with no daemon. The lightest text launcher (fuzzel, 8.5 MiB) is
+still slightly lower, but cuimoji now sits below bemenu and bemoji+bemenu while
+drawing a full emoji grid.
 
 Measured against rofi-emoji, fuzzel, rofimoji, wofi-emoji, bemoji, Smile, and
 Emote on Wayland. Full results and methodology: [BENCHMARK.md](BENCHMARK.md).

@@ -5,7 +5,7 @@ Measured memory and size of cuimoji against other Linux emoji pickers.
 ## Environment
 
 - Arch Linux, niri 26.04 on Wayland, 1920×1080, 16 GiB RAM.
-- **cuimoji** 0.5, Release build (stripped) from `build/cuimoji`, plus the Flatpak build.
+- **cuimoji** 0.6 native, Release build (stripped) from `build/cuimoji`; the Flatpak row is the earlier 0.5 measurement.
 - **rofi** 2.0.0 + **rofi-emoji** 4.1.0
 - **fuzzel** 1.15.0
 - **wofi** 1.5.3
@@ -40,7 +40,7 @@ comparing separate applications; RSS is what `ps` and systemd show.
 
 | Picker | Interface | Open PSS | Open RSS | Idle PSS |
 |---|---|---:|---:|---:|
-| **cuimoji** (native) | grid | **14.5 MiB** | 21.0 MiB | **0** |
+| **cuimoji** (native) | grid | **9.0 MiB** | 15.5 MiB | **0** |
 | **cuimoji** (Flatpak) | grid | 18.3 MiB | 23.9 MiB | 0 |
 | fuzzel + 1,870-line list | text | 8.5 MiB | 18.6 MiB | 0 |
 | fuzzel + 3,963-line list | text | 10.0 MiB | 20.1 MiB | 0 |
@@ -64,7 +64,7 @@ to 0 MiB when closed.
 
 | Picker | Install for the picker | Extra / shared |
 |---|---|---|
-| **cuimoji** native | 1.30 MiB binary + 61 KiB icon font | SDL2, X11, Wayland, Vulkan from the system |
+| **cuimoji** native | 1.22 MiB binary + 61 KiB icon font | SDL2, X11, Wayland, Vulkan from the system |
 | **cuimoji** Flatpak | 1.39 MiB app payload | freedesktop 25.08 runtime |
 | fuzzel | 240 KiB binary + 156 KiB emoji list | cairo, fcft, pango, fontconfig from the system |
 | bemenu | 89 KiB (client + Wayland renderer) | emoji list, Wayland from the system |
@@ -79,21 +79,21 @@ to 0 MiB when closed.
 
 | Picker | Open PSS | Idle PSS | App payload |
 |---|---:|---:|---:|
-| **cuimoji** | **14.5 MiB** | **0** | 1.39 MiB (Flatpak) |
+| **cuimoji** | **9.0 MiB** | **0** | 1.22 MiB native / 1.39 MiB Flatpak |
 | Smile | 188.7 MiB | 105–121 MiB | 8.31 MiB |
 | Emote | 201.3 MiB | 76–202 MiB | 15.07 MiB |
 
-cuimoji uses about 13× less PSS than Smile and 14× less than Emote. Its payload
-is about 6× smaller than Smile's and 11× smaller than Emote's. It is the only one
+cuimoji uses about 21× less PSS than Smile and 22× less than Emote. Its payload
+is about 7× smaller than Smile's and 12× smaller than Emote's. It is the only one
 of the three that uses 0 MiB when closed.
 
 ## Text selectors
 
-The four lowest open measurements are text selectors: fuzzel at 8.5–10.0 MiB
-PSS with a 1,870–3,963-line list, bemenu at 11.4 MiB, and bemoji + bemenu at
-13.6 MiB. fuzzel rises to 15.7 MiB with the 5,042-line tag list. These render
-text rows rather than an emoji grid. cuimoji at 14.5 MiB is the lowest
-grid-based picker measured.
+fuzzel remains the lowest at 8.5 MiB PSS with a 1,870-line list. cuimoji at
+9.0 MiB is now close to it — and lower than bemenu (11.4 MiB) and bemoji +
+bemenu (13.6 MiB) — despite rendering an emoji grid. fuzzel rises to 15.7 MiB
+with the 5,042-line tag list. cuimoji is still the lowest grid-based picker
+measured.
 
 ## Peak cgroup memory
 
@@ -104,7 +104,7 @@ systemd recorded these peaks for the original long-running sessions:
 | Smile | 297.7 MiB | 31.5 MiB |
 | Emote | 284.8 MiB | 32.1 MiB |
 
-cuimoji's peak in these tests was 14.5 MiB PSS (21.0 MiB RSS), with no daemon
+cuimoji's peak in these tests was 9.0 MiB PSS (15.5 MiB RSS), with no daemon
 or idle process.
 
 ## Reproducing
