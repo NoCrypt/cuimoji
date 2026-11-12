@@ -4,6 +4,14 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Real window transparency on Wayland: theme color alpha is composited by the
+  compositor, so the window and panel can show the desktop and compositor blur
+  behind them. Set `background = #rrggbb00` and give `surface` an alpha. The
+  X11 window remains opaque.
+
 ## [0.4] - 2026-11-12
 
 ### Added

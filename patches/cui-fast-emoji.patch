@@ -648,3 +648,25 @@ index b8d11e2..0847ba5 100644
  void cui__plat_show(cui_app *app);
  void *cui__plat_native(cui_app *app);
  const char *cui__plat_name(void);
+diff --git a/src/render/cui_render_sw.c b/src/render/cui_render_sw.c
+index 13af6b9..76d8270 100644
+--- a/src/render/cui_render_sw.c
++++ b/src/render/cui_render_sw.c
+@@ -575,8 +575,15 @@ static void *cui__sw_thread(void *p) { cui__sw_run(p); return NULL; }
+ static void cui__sw_paint_rect(cui_sw_renderer *r, const cui_draw_data *dd, void *pixels, int width, int height, int stride, cui_sw_format fmt,
+                                int x0, int y0, int x1, int y1) {
+     cui_color cc = dd->clear_color;
+-    uint8_t c4[4] = { cc.r, cc.g, cc.b, 255 };
+-    if (fmt == CUI_SW_BGRA) { c4[0] = cc.b; c4[2] = cc.r; }
++    /* The buffer is premultiplied RGBA/BGRA: a translucent clear colour needs
++     * its channels scaled by alpha, and the alpha itself must survive for the
++     * compositor. Opaque themes are unchanged. */
++    uint16_t a = cc.a;
++    uint8_t pr = (uint8_t)(((uint16_t)cc.r * a + 127u) / 255u);
++    uint8_t pg = (uint8_t)(((uint16_t)cc.g * a + 127u) / 255u);
++    uint8_t pb = (uint8_t)(((uint16_t)cc.b * a + 127u) / 255u);
++    uint8_t c4[4] = { pr, pg, pb, cc.a };
++    if (fmt == CUI_SW_BGRA) { c4[0] = pb; c4[2] = pr; }
+     for (int y = y0; y < y1; y++) {
+         uint8_t *row = (uint8_t *)pixels + (size_t)y * (size_t)stride + (size_t)x0 * 4;
+         for (int x = 0, n = x1 - x0; x < n; x++) memcpy(row + (size_t)x * 4, c4, 4);

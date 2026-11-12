@@ -144,6 +144,10 @@ colors, corner radii, control and text sizes, shadows, motion, and the text
 scale. Nothing changes until you uncomment a line. Edits are picked up while
 cuimoji runs; delete the file to regenerate the reference values.
 
+On the Wayland window, color alpha is composited: set `background =
+#0d111700` to leave the window transparent, and give `surface` an alpha such
+as `#161b22e6` for a see-through panel. The X11 window stays opaque.
+
 ## Desktop shortcut
 
 Add cuimoji to your compositor or desktop’s keyboard shortcuts. On

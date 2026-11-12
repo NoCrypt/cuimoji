@@ -105,7 +105,7 @@ static shm_buf *buf_get(int w, int h) {
             return NULL;
         }
         struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, (int)size);
-        struct wl_buffer *buf = wl_shm_pool_create_buffer(pool, 0, w, h, w * 4, WL_SHM_FORMAT_XRGB8888);
+        struct wl_buffer *buf = wl_shm_pool_create_buffer(pool, 0, w, h, w * 4, WL_SHM_FORMAT_ARGB8888);
         wl_shm_pool_destroy(pool);
         close(fd);
         if (!buf) {
@@ -164,6 +164,10 @@ int cuimoji_run_sdl(void) {
     }
     wldpy = wm.info.wl.display;
     surf = wm.info.wl.surface;
+    /* The software renderer writes premultiplied alpha. Leave the surface
+     * without an opaque region so translucency and rounded corners blend with
+     * the desktop; opaque themes are unaffected because their alpha is 255. */
+    wl_surface_set_opaque_region(surf, NULL);
 
     struct wl_registry *reg = wl_display_get_registry(wldpy);
     wl_registry_add_listener(reg, &reg_listener, NULL);

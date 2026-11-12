@@ -588,7 +588,10 @@ static void theme_write_template(const char *path, const cui_theme *t) {
             "# Dark/Light theme and over the Settings. Delete this file to regenerate\n"
             "# the commented reference values.\n"
             "#\n"
-            "# Colors are #rrggbb or #rrggbbaa. Sizes are points/pixels, motion and\n"
+            "# Colors are #rrggbb or #rrggbbaa. On the Wayland window the alpha\n"
+            "# channel is composited: a transparent background or a translucent\n"
+            "# surface shows the desktop (and compositor blur) behind the picker.\n"
+            "# The X11 window stays opaque. Sizes are points/pixels, motion and\n"
             "# font_scale are multipliers. font_scale is a text multiplier on\n"
             "# top of the UI size. Changes are picked up while cuimoji runs.\n\n"
             "# --- semantic colors -------------------------------------------\n");
