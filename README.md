@@ -29,8 +29,8 @@ that writes Ctrl+V straight to `/dev/uinput`.
   - **Emoji set** — System (Noto Color Emoji), Apple Color Emoji, or any
     `.ttf`/`.otf`/`.ttc` in `~/.local/share/cuimoji/emoji/`.
   - **Emoji size** — number field, step 2 (24–128 px).
-  - **Font size** — number field, step 5 (80–150 %); this is the text scale,
-    not a layout scale.
+  - **UI size** — number field, step 5 (80–150 %); zooms the whole UI
+    (text, controls, emoji) inside the window.
   - **Theme file** — `$XDG_STATE_HOME/cuimoji/theme` can override every CUI
     theme field: all semantic colors, tone colors, radii, control heights,
     text sizes, headings, shadows, motion, and the font-scale multiplier. It is

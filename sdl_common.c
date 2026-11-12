@@ -44,6 +44,10 @@ static int mods(void) {
     return r;
 }
 
+static float ui_zoom(void) {
+    return cuimoji_ui_zoom > 0.1f ? cuimoji_ui_zoom : 1.0f;
+}
+
 static bool handle_event(cui_ctx *ui, const SDL_Event *ev) {
     const SDL_Event e = *ev;
     switch (e.type) {
@@ -63,14 +67,14 @@ static bool handle_event(cui_ctx *ui, const SDL_Event *ev) {
         }
         return false;
     case SDL_MOUSEMOTION:
-        cui_input_mouse_move(ui, (float)e.motion.x, (float)e.motion.y);
+        cui_input_mouse_move(ui, (float)e.motion.x / ui_zoom(), (float)e.motion.y / ui_zoom());
         return true;
     case SDL_MOUSEBUTTONDOWN:
     case SDL_MOUSEBUTTONUP: {
         cui_mouse_button b = e.button.button == SDL_BUTTON_RIGHT ? CUI_MOUSE_RIGHT
                             : e.button.button == SDL_BUTTON_MIDDLE ? CUI_MOUSE_MIDDLE
                             : CUI_MOUSE_LEFT;
-        cui_input_mouse_move(ui, (float)e.button.x, (float)e.button.y);
+        cui_input_mouse_move(ui, (float)e.button.x / ui_zoom(), (float)e.button.y / ui_zoom());
         cui_input_mouse_button(ui, b, e.type == SDL_MOUSEBUTTONDOWN);
         return true;
     }

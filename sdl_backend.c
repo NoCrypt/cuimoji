@@ -249,7 +249,11 @@ int cuimoji_run_sdl(void) {
         last = now;
         if (dt <= 0 || dt > 0.25f) dt = 1.0f / 120.0f;
 
-        cui_set_viewport(ui, (float)ww, (float)wh, 1.0f);
+        float zoom = cuimoji_ui_zoom > 0.1f ? cuimoji_ui_zoom : 1.0f;
+        int lw = (int)((float)ww / zoom + 0.5f), lh = (int)((float)wh / zoom + 0.5f);
+        if (lw < 1) lw = 1;
+        if (lh < 1) lh = 1;
+        cui_set_viewport(ui, (float)lw, (float)lh, zoom);
         cui_begin_frame(ui, dt);
         cuimoji_ui(ui);
         cui_end_frame(ui);

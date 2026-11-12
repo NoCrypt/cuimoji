@@ -23,6 +23,8 @@ extern void (*cuimoji_hide_window)(void);
  * unset; the position is only meaningful on X11 (Wayland decides placement). */
 extern int cuimoji_win_w, cuimoji_win_h, cuimoji_win_x, cuimoji_win_y;
 extern bool cuimoji_win_pos_valid;
+/* UI size: the logical->physical zoom used by the SDL backends. */
+extern float cuimoji_ui_zoom;
 
 void cuimoji_state_load(void);
 void cuimoji_state_save(void);

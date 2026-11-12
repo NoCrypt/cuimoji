@@ -106,6 +106,8 @@ static bool debug_on;
 static int uinput_fd = -1;
 static Display *xdpy;
 static Window xwin;
+static cui_app *x11_app;
+static int x11_ui_scale = -1;
 static char paste_target[96];
 static float footer_y;
 static float footer_h = 34;
@@ -115,6 +117,7 @@ volatile sig_atomic_t cuimoji_toggle_requested;
 void (*cuimoji_hide_window)(void);
 int cuimoji_win_w, cuimoji_win_h, cuimoji_win_x, cuimoji_win_y;
 bool cuimoji_win_pos_valid;
+float cuimoji_ui_zoom = 1.0f;
 
 static void sig_toggle(int sig) {
     (void)sig;
@@ -462,8 +465,8 @@ static void theme_write_template(const char *path, const cui_theme *t) {
             "# the commented reference values.\n"
             "#\n"
             "# Colors are #rrggbb or #rrggbbaa. Sizes are points/pixels, motion and\n"
-            "# font_scale are multipliers. font_scale is applied on top of the\n"
-            "# Settings > Font size value. Changes are read at startup.\n\n"
+            "# font_scale are multipliers. font_scale is a text multiplier on\n"
+            "# top of the UI size. Changes are read at startup.\n\n"
             "# --- semantic colors -------------------------------------------\n");
     for (size_t i = 0; i < THEME_COLOR_COUNT; i++) {
         const cui_color *c = (const cui_color *)((const char *)t + theme_color_defs[i].off);
@@ -566,7 +569,7 @@ static void cuimoji_theme_apply(cui_ctx *ui) {
     size_t font_scale_off = offsetof(cui_theme, font_scale);
     for (size_t i = 0; i < THEME_NUM_COUNT; i++) {
         if (!(theme_num_mask & (1ull << i))) continue;
-        /* font_scale is a multiplier over Settings > Font size */
+        /* font_scale is a text multiplier over the UI size */
         if (theme_num_defs[i].off == font_scale_off)
             t->font_scale *= theme_num_vals[i];
         else
@@ -906,6 +909,11 @@ static bool printable_key_pressed(cui_ctx *ui) {
 }
 
 void cuimoji_ui(cui_ctx *ui) {
+    cuimoji_ui_zoom = (float)ui_scale / 100.0f;
+    if (x11_app && x11_ui_scale != ui_scale) {
+        x11_ui_scale = ui_scale;
+        cui_app_set_ui_scale(x11_app, (float)ui_scale / 100.0f);
+    }
     if (!theme_ready) {
         cuimoji_theme_init(ui);
         theme_ready = true;
@@ -952,7 +960,6 @@ void cuimoji_ui(cui_ctx *ui) {
          * settings gear on the right, both on the same line. */
         static char hint[48];
         snprintf(hint, sizeof hint, "cuimoji %s", CUIMOJI_VERSION);
-        ui->theme.font_scale = (float)ui_scale / 100.0f;
         cuimoji_theme_apply(ui);
         /* The grid view starts below the search row and the group tabs; its
          * y position is the chrome height (they scale with the UI size). */
@@ -1026,9 +1033,10 @@ void cuimoji_ui(cui_ctx *ui) {
                         }
                         double us = (double)ui_scale;
                         if (cui_number(ui, "ui-size", &us, 80, 150,
-                                       .label = "Font size", .step = 5, .suffix = " %",
+                                       .label = "UI size", .step = 5, .suffix = " %",
                                        .width = CUI_FILL)) {
                             ui_scale = (int)(us + 0.5);
+                            ui->settle_frames = 4;   /* apply the new zoom */
                             cuimoji_state_save();
                         }
                         double dl = (double)paste_delay_ms;
@@ -1116,6 +1124,9 @@ int main(void) {
 
     cui_app *app = cui_app_create(&desc);
     if (!app) return 1;
+    x11_app = app;
+    x11_ui_scale = ui_scale;
+    cui_app_set_ui_scale(app, (float)ui_scale / 100.0f);
 
     /* Tell XWayland/the compositor who we are, so the window rule and the focus check
      * have a stable app id. CUI's default is res_class "CUI". */

@@ -1,5 +1,18 @@
+diff --git a/include/cui/cui_app.h b/include/cui/cui_app.h
+index c8b8d42..149de99 100644
+--- a/include/cui/cui_app.h
++++ b/include/cui/cui_app.h
+@@ -69,6 +69,8 @@ CUI_API int cui_app_run(const cui_app_desc *desc, void (*frame)(cui_ctx *ui, voi
+ CUI_API void cui_app_quit(cui_app *app);
+ CUI_API void cui_app_set_title(cui_app *app, const char *title);
+ CUI_API void cui_app_set_size(cui_app *app, int width, int height);
++/* Scales the whole UI inside the window (1 = normal, 1.25 = 125%). */
++CUI_API void cui_app_set_ui_scale(cui_app *app, float scale);
+ CUI_API cui_vec2 cui_app_size(cui_app *app);
+ CUI_API bool cui_app_is_software(cui_app *app);
+ /* HWND, NSWindow*, X11 Window (cast to uintptr_t), SDL_Window* or GLFWwindow*. */
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..a210239 100644
+index c15f341..78aba5d 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -7,7 +20,7 @@ index c15f341..a210239 100644
  #define CUI__EM_IDLE 600   /* frames without an emoji before the texture is let go */
  #define CUI__EM_SLOTS_MAX 1024
 -#define CUI__EM_BUDGET 12   /* new emoji drawn per frame; the rest come next frame */
-+#define CUI__EM_BUDGET 256   /* new emoji drawn per frame; the rest come next frame */
++#define CUI__EM_BUDGET 512   /* new emoji drawn per frame; the rest come next frame */
  
  typedef struct { uint32_t key; uint16_t px; uint8_t state; bool mono; uint64_t used; } cui__em_slot;   /* state: 0 empty, 1 drawn, 2 missing */
  
@@ -371,3 +384,71 @@ index cfca9d8..3f95724 100644
          cui_color focus_c = cui__edge_on(ui);
          border = cui_mix(border, focus_c, e->focus);
          if (has_error) border = CUI_C(ui, DANGER);
+diff --git a/src/platform/cui_app.c b/src/platform/cui_app.c
+index 3d9d62c..544403b 100644
+--- a/src/platform/cui_app.c
++++ b/src/platform/cui_app.c
+@@ -128,6 +128,17 @@ void cui_app_set_title(cui_app *app, const char *title) {
+ 
+ void cui_app_set_size(cui_app *app, int w, int h) { cui__plat_set_size(app, w, h); }
+ 
++#if defined(__GNUC__)
++__attribute__((weak))
++#endif
++void cui__plat_set_ui_scale(cui_app *app, float scale) { (void)app; (void)scale; }
++
++void cui_app_set_ui_scale(cui_app *app, float scale) {
++    if (!app || scale <= 0) return;
++    cui__plat_set_ui_scale(app, scale);
++    cui_request_redraw(app->ui);
++}
++
+ cui_vec2 cui_app_size(cui_app *app) {
+     float w, h, s;
+     int fw, fh;
+diff --git a/src/platform/cui_app_x11.c b/src/platform/cui_app_x11.c
+index 8afd78d..fde0d30 100644
+--- a/src/platform/cui_app_x11.c
++++ b/src/platform/cui_app_x11.c
+@@ -63,7 +63,7 @@ typedef struct {
+     Cursor cursors[CUI_CURSOR_COUNT];
+     cui_cursor current_cursor;
+     int width, height;     /* pixels */
+-    float scale;
++    float scale, base_scale;
+     GC gc;
+     XImage *image;
+     /* GLX */
+@@ -154,6 +154,7 @@ bool cui__plat_init(cui_app *app) {
+     if (!x->dpy) { free(x); app->plat = NULL; return false; }
+     x->screen = DefaultScreen(x->dpy);
+     x->scale = cui__x11_dpi_scale(x->dpy);
++    x->base_scale = x->scale;
+     Window root = RootWindow(x->dpy, x->screen);
+     x->visual = DefaultVisual(x->dpy, x->screen);
+     x->depth = DefaultDepth(x->dpy, x->screen);
+@@ -359,6 +360,12 @@ bool cui__plat_present_part(cui_app *app, const void *bgra, int w, int h, int st
+     return true;
+ }
+ 
++void cui__plat_set_ui_scale(cui_app *app, float scale) {
++    cui__x11 *x = cui__x(app);
++    if (scale <= 0) scale = 1;
++    x->scale = x->base_scale * scale;
++}
++
+ void cui__plat_metrics(cui_app *app, float *w, float *h, float *scale, int *fb_w, int *fb_h) {
+     cui__x11 *x = cui__x(app);
+     *scale = x->scale;
+diff --git a/src/platform/cui_platform.h b/src/platform/cui_platform.h
+index b8d11e2..0847ba5 100644
+--- a/src/platform/cui_platform.h
++++ b/src/platform/cui_platform.h
+@@ -51,6 +51,7 @@ void cui__plat_wait(cui_app *app, double timeout);   /* < 0 waits for the next e
+ void cui__plat_metrics(cui_app *app, float *w, float *h, float *scale, int *fb_w, int *fb_h);
+ void cui__plat_set_title(cui_app *app, const char *title);
+ void cui__plat_set_size(cui_app *app, int w, int h);
++void cui__plat_set_ui_scale(cui_app *app, float scale);
+ void cui__plat_show(cui_app *app);
+ void *cui__plat_native(cui_app *app);
+ const char *cui__plat_name(void);
