@@ -27,7 +27,7 @@
         {
           "type": "archive",
           "url": "https://github.com/NoCrypt/cuimoji/releases/download/v0.6/cuimoji-0.6-linux-x86_64.tar.gz",
-          "sha256": "9cb1373aaee25f09907250f11b9a475116c08af256c8b687e3e289047ea50720",
+          "sha256": "77e80d8da9b903a8aada25229d40a172ab07dc2ca5bca43f6190c7b6fefa2747",
           "strip-components": 0
         },
         {
