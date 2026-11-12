@@ -34,8 +34,6 @@ jobs:
           chmod 755 stage/cuimoji stage/install.sh
           chmod 644 stage/lucide-cuimoji.ttf stage/icon.png stage/LICENSE stage/README.md
           tar -czf "dist/cuimoji-${version}-linux-x86_64.tar.gz" -C stage .
-          (cd dist && sha256sum "cuimoji-${version}-linux-x86_64.tar.gz" \
-             > "cuimoji-${version}-linux-x86_64.tar.gz.sha256")
       - name: AppImage
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
@@ -55,8 +53,6 @@ jobs:
           appimage=$(find . -maxdepth 1 -name 'cuimoji-*-x86_64.AppImage' -print -quit)
           [ -n "$appimage" ] || { echo "linuxdeploy did not produce an AppImage" >&2; exit 1; }
           mv "$appimage" "dist/cuimoji-${version}-linux-x86_64.AppImage"
-          (cd dist && sha256sum "cuimoji-${version}-linux-x86_64.AppImage" \
-             > "cuimoji-${version}-linux-x86_64.AppImage.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -85,9 +81,6 @@ jobs:
           su builder -c 'makepkg -f --noconfirm'
           mkdir -p ../../dist
           cp "cuimoji-${version}-1-x86_64.pkg.tar.zst" ../../dist/
-          cd ../../dist
-          sha256sum "cuimoji-${version}-1-x86_64.pkg.tar.zst" \
-            > "cuimoji-${version}-1-x86_64.pkg.tar.zst.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: arch
@@ -132,8 +125,6 @@ jobs:
             build-dir flatpak-manifest.json
           flatpak build-bundle flatpak-repo "dist/cuimoji-${version}-x86_64.flatpak" \
             io.github.NoCrypt.cuimoji master
-          (cd dist && sha256sum "cuimoji-${version}-x86_64.flatpak" \
-             > "cuimoji-${version}-x86_64.flatpak.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: flatpak

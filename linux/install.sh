@@ -86,11 +86,8 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 echo "Downloading cuimoji $VERSION..."
 curl -fL --retry 3 --connect-timeout 15 -o "$TMP/$TARBALL" "$URL" \
     || die "could not download $URL"
-if command -v sha256sum >/dev/null 2>&1 \
-    && curl -fsSL --connect-timeout 15 -o "$TMP/$TARBALL.sha256" "$URL.sha256" 2>/dev/null; then
-    (cd "$TMP" && sha256sum -c "$TARBALL.sha256") >/dev/null \
-        || die "download checksum failed."
-fi
+# GitHub serves each asset over HTTPS and publishes its SHA-256 digest on the
+# release page; no separate checksum file is needed.
 tar -xzf "$TMP/$TARBALL" -C "$TMP" || die "could not extract the archive."
 [ -f "$TMP/cuimoji" ] || die "archive is missing the cuimoji binary."
 
