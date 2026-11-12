@@ -1,4 +1,14 @@
-# cuimoji
+<p align="center">
+  <img src="assets/icon.png" width="128" height="128" alt="cuimoji icon">
+</p>
+
+<h1 align="center">cuimoji</h1>
+
+<p align="center">
+  <a href="https://github.com/NoCrypt/cuimoji/releases/latest"><img src="https://img.shields.io/github/v/release/NoCrypt/cuimoji?label=release&color=2ea043" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/NoCrypt/cuimoji?color=blue" alt="License"></a>
+  <img src="https://img.shields.io/badge/platform-Linux-6e7681" alt="Linux">
+</p>
 
 A small, fast emoji picker for Linux. Open it with a shortcut, type or click an
 emoji, and cuimoji pastes it into the app you were already using.
@@ -11,7 +21,7 @@ and has no background service: it only runs while the picker is open.
   <img src="assets/screenshot-light.png" width="49%" alt="cuimoji with the light theme">
 </p>
 
-<p align="center"><em>Dark and light theme, 150% UI size.</em></p>
+<p align="center"><em>Dark and light theme.</em></p>
 
 ## What you get
 
