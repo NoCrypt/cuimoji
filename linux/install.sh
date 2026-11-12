@@ -3,7 +3,7 @@
 set -eu
 
 REPO="NoCrypt/cuimoji"
-DEFAULT_VERSION="0.5"
+DEFAULT_VERSION="0.6"
 PREFIX="${CUIMOJI_PREFIX:-$HOME/.local}"
 LIB_DIR="$PREFIX/lib/cuimoji"
 BIN_DIR="$PREFIX/bin"
