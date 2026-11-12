@@ -12,7 +12,7 @@ index c8b8d42..149de99 100644
  CUI_API bool cui_app_is_software(cui_app *app);
  /* HWND, NSWindow*, X11 Window (cast to uintptr_t), SDL_Window* or GLFWwindow*. */
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..78aba5d 100644
+index c15f341..6ceb42f 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -20,7 +20,7 @@ index c15f341..78aba5d 100644
  #define CUI__EM_IDLE 600   /* frames without an emoji before the texture is let go */
  #define CUI__EM_SLOTS_MAX 1024
 -#define CUI__EM_BUDGET 12   /* new emoji drawn per frame; the rest come next frame */
-+#define CUI__EM_BUDGET 512   /* new emoji drawn per frame; the rest come next frame */
++#define CUI__EM_BUDGET 1024   /* new emoji drawn per frame; the rest come next frame */
  
  typedef struct { uint32_t key; uint16_t px; uint8_t state; bool mono; uint64_t used; } cui__em_slot;   /* state: 0 empty, 1 drawn, 2 missing */
  
