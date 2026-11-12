@@ -9,7 +9,12 @@ The picker is CUI's searchable emoji grid; cuimoji adds the desktop glue: a
 settings popover, window-backend choices, remembered geometry, and a paste path
 that writes Ctrl+V straight to `/dev/uinput`.
 
-![cuimoji interface](assets/screenshot.png)
+<p align="center">
+  <img src="assets/screenshot-dark.png" width="49%" alt="cuimoji with the dark theme">
+  <img src="assets/screenshot-light.png" width="49%" alt="cuimoji with the light theme">
+</p>
+
+<p align="center"><em>Dark and light theme, 150% UI size.</em></p>
 
 ## Features
 
