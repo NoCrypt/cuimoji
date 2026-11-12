@@ -4,7 +4,7 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5] - 2026-11-12
 
 ### Added
 - Real window transparency on Wayland: theme color alpha is composited by the
@@ -83,6 +83,7 @@ All notable changes to cuimoji are recorded here. The format follows
 - Fast auto-paste through `/dev/uinput`, with no daemon or portal.
 - Settings and state persistence.
 
+[0.5]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.5
 [0.4]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.4
 [0.3]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.3
 [0.2]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.2
