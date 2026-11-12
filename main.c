@@ -701,6 +701,14 @@ static void add_font(const char *label, const char *path) {
     font_count++;
 }
 
+static bool font_label_exists(const char *label) {
+    for (int i = 0; i < font_count; i++)
+        if (strcmp(font_labels[i], label) == 0) return true;
+    return false;
+}
+
+typedef struct { int nfont; void **fonts; } fc_fontset;
+
 /* Optional fontconfig discovery: find the emoji families wherever the distro
  * installed them, instead of relying on the two or three known paths. The
  * library is loaded at runtime, so systems without it still work. */
@@ -720,6 +728,17 @@ static void fontconfig_scan(void) {
     int (*pattern_get_string)(void *, const char *, int, unsigned char **) =
         (int (*)(void *, const char *, int, unsigned char **))dlsym(lib, "FcPatternGetString");
     void *(*config_get_current)(void) = (void *(*)(void))dlsym(lib, "FcConfigGetCurrent");
+    void *(*font_list)(void *, void *, void *) = (void *(*)(void *, void *, void *))dlsym(lib, "FcFontList");
+    void *(*object_set_create)(void) = (void *(*)(void))dlsym(lib, "FcObjectSetCreate");
+    int (*object_set_add)(void *, const char *) = (int (*)(void *, const char *))dlsym(lib, "FcObjectSetAdd");
+    void (*object_set_destroy)(void *) = (void (*)(void *))dlsym(lib, "FcObjectSetDestroy");
+    void (*font_set_destroy)(void *) = (void (*)(void *))dlsym(lib, "FcFontSetDestroy");
+    int (*pattern_get_bool)(void *, const char *, int, int *) =
+        (int (*)(void *, const char *, int, int *))dlsym(lib, "FcPatternGetBool");
+    int (*pattern_get_charset)(void *, const char *, int, void **) =
+        (int (*)(void *, const char *, int, void **))dlsym(lib, "FcPatternGetCharSet");
+    int (*charset_has_char)(void *, unsigned int) =
+        (int (*)(void *, unsigned int))dlsym(lib, "FcCharSetHasChar");
     if (!fc_init || !pattern_create || !pattern_destroy || !pattern_add_string ||
         !config_substitute || !default_substitute || !font_match ||
         !pattern_get_string || !config_get_current || !fc_init()) {
@@ -750,6 +769,43 @@ static void fontconfig_scan(void) {
             pattern_destroy(match);
         }
         pattern_destroy(pat);
+    }
+
+    /* Also list any other installed font that advertises color glyphs and has
+     * an emoji character (One UI Emoji, OpenMoji, Twemoji, JoyPixels, ...). */
+    if (font_list && object_set_create && object_set_add && object_set_destroy &&
+        font_set_destroy && pattern_get_bool && pattern_get_charset && charset_has_char) {
+        void *pat = pattern_create();
+        void *os = object_set_create();
+        if (pat && os) {
+            object_set_add(os, "family");
+            object_set_add(os, "file");
+            object_set_add(os, "color");
+            object_set_add(os, "charset");
+            fc_fontset *set = font_list(config, pat, os);
+            if (set) {
+                for (int i = 0; i < set->nfont; i++) {
+                    void *font = set->fonts[i];
+                    unsigned char *family = NULL, *file = NULL;
+                    void *charset = NULL;
+                    int color = 0;
+                    if (pattern_get_string(font, "family", 0, &family) != 0 || !family || !family[0]) continue;
+                    if (pattern_get_string(font, "file", 0, &file) != 0 || !file) continue;
+                    pattern_get_bool(font, "color", 0, &color);
+                    bool has_emoji = pattern_get_charset(font, "charset", 0, &charset) == 0 && charset &&
+                        (charset_has_char(charset, 0x1F600) || charset_has_char(charset, 0x1F44D));
+                    bool name_emoji = strcasestr((const char *)family, "emoji") ||
+                                      strcasestr((const char *)family, "moji");
+                    if (!has_emoji || (!color && !name_emoji)) continue;
+                    if (strcasestr((const char *)family, "high contrast")) continue;
+                    if (font_label_exists((const char *)family)) continue;
+                    add_font((const char *)family, (const char *)file);
+                }
+                font_set_destroy(set);
+            }
+        }
+        if (pat) pattern_destroy(pat);
+        if (os) object_set_destroy(os);
     }
     dlclose(lib);
 }
