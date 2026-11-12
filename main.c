@@ -768,6 +768,29 @@ void cuimoji_font_apply(cui_ctx *ui) {
         }
     }
 
+    /* Some fonts (notably Apple Color Emoji) have no color data for the
+     * standalone female/male/medical symbols. Load a text symbol fallback so
+     * CUI can draw them instead of leaving blank cells. */
+    static bool symbol_fallback_loaded;
+    if (!symbol_fallback_loaded) {
+        symbol_fallback_loaded = true;
+        static const char *const symbol_paths[] = {
+            "/usr/share/fonts/noto/NotoSansSymbols-Regular.ttf",
+            "/usr/share/fonts/gsfonts/NimbusSans-Regular.otf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        };
+        for (size_t i = 0; i < sizeof symbol_paths / sizeof symbol_paths[0]; i++) {
+            if (access(symbol_paths[i], R_OK) != 0) continue;
+            cui_font sym = cui_font_load_file(ui, symbol_paths[i]);
+            if (sym >= 0) {
+                cui_font_add_fallback(ui, CUI_FONT_BODY, sym);
+                cui_font_add_fallback(ui, CUI_FONT_MEDIUM, sym);
+                break;
+            }
+        }
+    }
+
     int idx = font_index >= 0 && font_index < font_count ? font_index : 0;
     snprintf(selected_font, sizeof selected_font, "%s", font_paths[idx]);
     /* Switching fonts at runtime: tear the emoji state (font, atlas, cached

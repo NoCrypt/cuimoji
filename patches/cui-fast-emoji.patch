@@ -12,7 +12,7 @@ index c8b8d42..149de99 100644
  CUI_API bool cui_app_is_software(cui_app *app);
  /* HWND, NSWindow*, X11 Window (cast to uintptr_t), SDL_Window* or GLFWwindow*. */
 diff --git a/src/cui_emoji.c b/src/cui_emoji.c
-index c15f341..6ceb42f 100644
+index c15f341..f21a0b2 100644
 --- a/src/cui_emoji.c
 +++ b/src/cui_emoji.c
 @@ -15,12 +15,14 @@
@@ -245,7 +245,44 @@ index c15f341..6ceb42f 100644
          e->per_row = e->atlas / e->cell;
          e->nslots = CUI_MIN(e->per_row * e->per_row, CUI__EM_SLOTS_MAX);
          memset(e->slots, 0, sizeof e->slots);
-@@ -878,6 +1028,16 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
+@@ -747,6 +897,17 @@ static int cui__em_get_slot(cui_ctx *ui, cui__emoji *e, const char *utf8, int le
+     return ok ? lru : -1;
+ }
+ 
++/* Apple Color Emoji maps these text-presentation symbols to glyphs without any
++ * bitmap or outline data. Draw them with the text font instead of leaving the
++ * cell blank. */
++static bool cui__em_symbol_text(const char *s, int len) {
++    uint32_t cps[4];
++    int n = cui__utf8_cps(s, len, cps, 4);
++    if (n < 1 || n > 2) return false;
++    if (n == 2 && cps[1] != 0xFE0F) return false;
++    return cps[0] == 0x2640 || cps[0] == 0x2642 || cps[0] == 0x2695;
++}
++
+ /* draws at r; false when the emoji cannot be drawn (missing, or not ready yet) */
+ static bool cui__em_draw(cui_ctx *ui, const char *utf8, int len, cui_rect r, float alpha, bool *missing) {
+     bool miss = false;
+@@ -757,7 +918,17 @@ static bool cui__em_draw(cui_ctx *ui, const char *utf8, int len, cui_rect r, flo
+     int px = (int)ceilf(side * ui->scale);
+     int i = cui__em_get_slot(ui, e, utf8, len, px, &miss);
+     if (missing) *missing = miss;
+-    if (i < 0) return false;
++    if (i < 0) {
++        if (cui__em_symbol_text(utf8, len)) {
++            float fside = CUI_MIN(r.w, r.h);
++            cui__draw_text_line(ui, CUI_FONT_BODY, fside,
++                                r.x + (r.w - fside) * 0.5f, r.y + (r.h - fside) * 0.5f,
++                                CUI_C(ui, FOREGROUND), utf8, len, false);
++            if (missing) *missing = false;
++            return true;
++        }
++        return false;
++    }
+     px = e->slots[i].px;
+     float c = (float)e->cell, A = (float)e->atlas;
+     float x = (float)(i % e->per_row) * c + 1, y = (float)(i / e->per_row) * c + 1;
+@@ -878,6 +1049,16 @@ static int cui__em_toned(const char *s, int len, int tone, char *out, int cap) {
  }
  
  
@@ -262,7 +299,7 @@ index c15f341..6ceb42f 100644
  /* every word of the query starts a word of the name */
  static bool cui__em_match(const char *name, int nlen, const char *q) {
      while (*q) {
-@@ -893,6 +1053,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
+@@ -893,6 +1074,14 @@ static bool cui__em_match(const char *name, int nlen, const char *q) {
              while (k < wl && cui__ascii_lower((unsigned char)name[i + k]) == cui__ascii_lower((unsigned char)w[k])) k++;
              found = k == wl;
          }
@@ -277,7 +314,7 @@ index c15f341..6ceb42f 100644
          if (!found) return false;
      }
      return true;
-@@ -907,8 +1075,18 @@ enum { CUI__EM_GROUPS = 9, CUI__EM_SECTIONS = CUI__EM_GROUPS + 2 };   /* recent,
+@@ -907,8 +1096,18 @@ enum { CUI__EM_GROUPS = 9, CUI__EM_SECTIONS = CUI__EM_GROUPS + 2 };   /* recent,
  
  static const char *const cui__em_group_names[10] = { "Recent", "Smileys & emotion", "People & body", "Animals & nature", "Food & drink",
                                                        "Travel & places", "Activities", "Objects", "Symbols", "Flags" };
@@ -298,7 +335,7 @@ index c15f341..6ceb42f 100644
  
  typedef struct { int start, count, kind; } cui__em_section;   /* kind: 0 recent, 1..9 a group, 10 results */
  
-@@ -1062,7 +1240,7 @@ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
+@@ -1062,7 +1261,7 @@ static void cui__paint_emoji_tab(cui_ctx *ui, cui_node *n, void *data) {
      cui_rect r = n->rect;
      float side = 18;
      cui_rect d = { r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side };
@@ -307,7 +344,7 @@ index c15f341..6ceb42f 100644
      else cui__em_draw(ui, p->s, p->len, d, p->alpha, NULL);
      if (p->active) cui_draw_rect(ui, (cui_rect){ r.x + 6, r.y + r.h - 2, r.w - 12, 2 }, CUI_CORNERS(1), p->bar);
  }
-@@ -1107,6 +1285,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
+@@ -1107,6 +1306,7 @@ static void cui__em_build(cui__emoji *e, cui__em_state *st, int nrecent) {
                  const cui__em_rec *rec = &e->recs[i];
                  const char *name = e->data + rec->name;
                  bool m = cui__em_match(name, rec->name_len, st->query);
@@ -315,7 +352,7 @@ index c15f341..6ceb42f 100644
                  if (!m) continue;
                  size_t ql = strlen(st->query);
                  bool lead = ql <= rec->name_len;
-@@ -1344,6 +1523,7 @@ static void cui__em_build_top_row(cui__em_frame *f) {
+@@ -1344,6 +1544,7 @@ static void cui__em_build_top_row(cui__em_frame *f) {
      rn->pad[0] = rn->pad[1] = rn->pad[3] = 10; rn->pad[2] = 6;
      cui__open(ui, row);
      if (st->tone_open) {
@@ -323,7 +360,7 @@ index c15f341..6ceb42f 100644
          for (int k = 0; k < 6; k++) {
              cui_push_id_int(ui, k);
              cui_id tid = cui_make_id(ui, "#tone");
-@@ -1396,7 +1576,7 @@ static void cui__em_build_tabs(cui__em_frame *f) {
+@@ -1396,7 +1597,7 @@ static void cui__em_build_tabs(cui__em_frame *f) {
              else for (int i = 0; i < g->nsec; i++) if (g->sec[i].kind == kind) { st->target = cui__em_sec_top(g, i); st->animating = true; }
          }
          /* the tabs share the width, so a phone fits all ten */
@@ -332,7 +369,7 @@ index c15f341..6ceb42f 100644
          ui->nodes[b].max_w = 40;
          if (ti.hovered) ui->nodes[b].bg = CUI_C(ui, HOVER);
          cui__em_tab_paint *tp = ui->nodes[b].paint_data;
-@@ -1453,7 +1633,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
+@@ -1453,7 +1654,7 @@ static void cui__em_build_preview(cui__em_frame *f) {
      cui_node *rn = &ui->nodes[row];
      rn->dir = CUI_ROW; rn->align = CUI_ALIGN_CENTER; rn->w = CUI_FILL; rn->h = CUI_PX(48); rn->gap = 10; rn->pad[1] = rn->pad[3] = 12;
      cui__open(ui, row);
