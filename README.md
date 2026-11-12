@@ -193,6 +193,10 @@ Emoji’s skin-tone glyph names. The native Wayland window uses SDL2; the X11
 window uses CUI’s own window. `CUIMOJI_DEBUG=1` prints paste timings; on the
 X11 window, `CUIMOJI_GL=1` forces OpenGL.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
+
 ## AI disclosure
 
 This project was developed with substantial assistance from an AI coding agent
