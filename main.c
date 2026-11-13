@@ -24,12 +24,31 @@
 
 /* The app needs a few small pieces from CUI's internals: the platform
  * clipboard callback, a wakeup after the window is hidden (so the X11
- * selection stays served), and ids inside the emoji picker. Pinned to CUI
- * v1.2.0. */
+ * selection stays served), and ids inside the emoji picker. CUI is vendored
+ * under third_party/cui. */
 #include "cui_internal.h"
 
 #include "uinput.h"
 #include "cuimoji.h"
+
+/* Picks remembered for search ranking, most used first. Persisted in state. */
+#define USAGE_MAX 64
+typedef struct { char emoji[32]; unsigned char len; unsigned count; } usage_entry;
+static usage_entry usage[USAGE_MAX];
+static int usage_n;
+
+static void usage_sort(void);
+
+/* CUI's weak hook: boost a search hit by how often the app has picked it. */
+int cui__em_usage_score(const char *emoji, int len) {
+    if (len <= 0 || len >= 32) return 0;
+    for (int i = 0; i < usage_n; i++) {
+        if (usage[i].len != len || memcmp(usage[i].emoji, emoji, (size_t)len)) continue;
+        int bonus = 700 - i * 15;
+        return bonus > 0 ? bonus : 0;
+    }
+    return 0;
+}
 
 #ifdef CUIMOJI_HAVE_EMOJIBASE
 #include "emojibase.h"
@@ -111,12 +130,12 @@ static int alias_score_text(const char *text, const char *query, bool shortcode)
     int ql = (int)strlen(query);
     if (!full[0] || !ql) return 0;
     int best = 0;
-    int exact = shortcode ? 1100 : 650;
-    int prefix = shortcode ? 950 : 550;
-    int contains = shortcode ? 800 : 400;
-    int word_exact = shortcode ? 1100 : 600;
-    int word_prefix = shortcode ? 900 : 500;
-    int word_contains = shortcode ? 750 : 350;
+    int exact = shortcode ? 1550 : 700;
+    int prefix = shortcode ? 1150 : 550;
+    int contains = shortcode ? 850 : 400;
+    int word_exact = shortcode ? 1500 : 650;
+    int word_prefix = shortcode ? 1000 : 500;
+    int word_contains = shortcode ? 780 : 350;
     if (strcmp(full, query) == 0) best = exact;
     else if (strncmp(full, query, (size_t)ql) == 0) best = prefix;
     else if (strstr(full, query)) best = contains;
@@ -211,9 +230,11 @@ static int emoji_size = 28;
 static int ui_scale = 100;
 static int paste_delay_ms = 20;   /* fallback when the compositor cannot be asked */
 static bool paste_after_pick = true;
+static bool close_on_blur;        /* quit when the window loses keyboard focus */
 static int theme_mode;            /* 0 dark, 1 light */
 static int platform_mode;         /* 0 auto, 1 wayland (SDL2), 2 X11 */
 static bool initial_focus_done;
+static bool window_has_been_focused;
 static bool debug_on;
 static int uinput_fd = -1;
 static Display *xdpy;
@@ -863,7 +884,7 @@ void cuimoji_state_load(void) {
     FILE *f = fopen(path, "r");
     if (!f) return;
 
-    char line[2048];
+    char line[4096];
     while (fgets(line, sizeof line, f)) {
         if (strncmp(line, "tone=", 5) == 0) {
             tone = atoi(line + 5);
@@ -872,6 +893,28 @@ void cuimoji_state_load(void) {
         } else if (strncmp(line, "recent=", 7) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             snprintf(recent, sizeof recent, "%s", line + 7);
+        } else if (strncmp(line, "usage=", 6) == 0) {
+            line[strcspn(line, "\r\n")] = 0;
+            char *p = line + 6;
+            while (*p && usage_n < USAGE_MAX) {
+                while (*p == ' ') p++;
+                if (!*p) break;
+                char *w = p;
+                while (*p && *p != ' ') p++;
+                if (*p) *p++ = 0;
+                char *colon = strrchr(w, ':');
+                if (!colon) continue;
+                *colon = 0;
+                unsigned count = (unsigned)strtoul(colon + 1, NULL, 10);
+                size_t wl = strlen(w);
+                if (!wl || wl >= sizeof usage[0].emoji || !count) continue;
+                usage_entry *e = &usage[usage_n++];
+                memcpy(e->emoji, w, wl);
+                e->emoji[wl] = 0;
+                e->len = (unsigned char)wl;
+                e->count = count;
+            }
+            usage_sort();
         } else if (strncmp(line, "emoji_font=", 11) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             snprintf(selected_font, sizeof selected_font, "%s", line + 11);
@@ -881,6 +924,8 @@ void cuimoji_state_load(void) {
             if (paste_delay_ms > 500) paste_delay_ms = 500;
         } else if (strncmp(line, "paste=", 6) == 0) {
             paste_after_pick = atoi(line + 6) != 0;
+        } else if (strncmp(line, "close_on_blur=", 14) == 0) {
+            close_on_blur = atoi(line + 14) != 0;
         } else if (strncmp(line, "platform=", 9) == 0) {
             line[strcspn(line, "\r\n")] = 0;
             if (strcmp(line + 9, "wayland") == 0) platform_mode = 1;
@@ -936,6 +981,37 @@ static void capture_x11_geometry(void) {
     }
 }
 
+/* most used first; equal counts keep their order */
+static void usage_sort(void) {
+    for (int i = 1; i < usage_n; i++) {
+        usage_entry e = usage[i];
+        int j = i - 1;
+        while (j >= 0 && usage[j].count < e.count) { usage[j + 1] = usage[j]; j--; }
+        usage[j + 1] = e;
+    }
+}
+
+static void usage_bump(const char *emoji) {
+    size_t len = strlen(emoji);
+    if (!len || len >= sizeof usage[0].emoji) return;
+    int i = 0;
+    for (; i < usage_n; i++)
+        if (usage[i].len == len && !memcmp(usage[i].emoji, emoji, len)) break;
+    if (i == usage_n) {
+        if (usage_n >= USAGE_MAX) return;
+        i = usage_n++;
+        memcpy(usage[i].emoji, emoji, len);
+        usage[i].emoji[len] = 0;
+        usage[i].len = (unsigned char)len;
+        usage[i].count = 0;
+    }
+    if (usage[i].count < 1000000) usage[i].count++;
+    while (i > 0 && usage[i].count > usage[i - 1].count) {
+        usage_entry t = usage[i]; usage[i] = usage[i - 1]; usage[i - 1] = t;
+        i--;
+    }
+}
+
 void cuimoji_state_save(void) {
     capture_x11_geometry();
     char dir[1024], path[1200], tmp[1300];
@@ -946,16 +1022,21 @@ void cuimoji_state_save(void) {
     if (!f) return;
     fprintf(f,
             "tone=%d\nrecent=%s\nemoji_font=%s\nemoji_size=%d\nui_scale=%d\npaste_delay=%d\ntheme=%s\n"
-            "platform=%s\nrenderer=%s\npaste=%d\n",
+            "platform=%s\nrenderer=%s\npaste=%d\nclose_on_blur=%d\n",
             tone, recent, selected_font, emoji_size, ui_scale, paste_delay_ms,
             theme_mode ? "light" : "dark",
             platform_mode == 1 ? "wayland" : platform_mode == 2 ? "x11" : "auto",
             renderer_mode == 1 ? "opengl" : renderer_mode == 2 ? "vulkan" : "software",
-            paste_after_pick ? 1 : 0);
+            paste_after_pick ? 1 : 0, close_on_blur ? 1 : 0);
     if (cuimoji_win_w && cuimoji_win_h)
         fprintf(f, "win_w=%d\nwin_h=%d\n", cuimoji_win_w, cuimoji_win_h);
     if (cuimoji_win_pos_valid)
         fprintf(f, "win_pos=%d,%d\n", cuimoji_win_x, cuimoji_win_y);
+    if (usage_n) {
+        fputs("usage=", f);
+        for (int i = 0; i < usage_n; i++) fprintf(f, "%s:%u ", usage[i].emoji, usage[i].count);
+        fputc('\n', f);
+    }
     fclose(f);
     rename(tmp, path);
 }
@@ -1341,6 +1422,11 @@ static bool printable_key_pressed(cui_ctx *ui) {
 }
 
 void cuimoji_ui(cui_ctx *ui) {
+    if (ui->window_focused) window_has_been_focused = true;
+    else if (window_has_been_focused && close_on_blur) {
+        cuimoji_quit_requested = true;
+        return;
+    }
 #if defined(__GLIBC__)
     /* The first grid fill leaves temporary glyph buffers in glibc's heap. */
     if (!memory_trim_at) memory_trim_at = now_ms() + 1500.0;
@@ -1432,6 +1518,7 @@ void cuimoji_ui(cui_ctx *ui) {
                 .hint = hint);
 
             if (emoji) {
+                usage_bump(emoji);
                 do_pick(ui, emoji);
             } else if (cui_key_pressed(ui, CUI_KEY_ESCAPE)) {
                 cuimoji_state_save();
@@ -1474,6 +1561,13 @@ void cuimoji_ui(cui_ctx *ui) {
                         if (cui_select(ui, "paste-mode", paste_items, 2, &paste_choice,
                                        .label = "Paste after picking", .width = CUI_FILL)) {
                             paste_after_pick = paste_choice == 0;
+                            cuimoji_state_save();
+                        }
+                        static const char *const blur_items[] = { "On", "Off" };
+                        int blur_choice = close_on_blur ? 0 : 1;
+                        if (cui_select(ui, "close-on-blur", blur_items, 2, &blur_choice,
+                                       .label = "Close on focus loss", .width = CUI_FILL)) {
+                            close_on_blur = blur_choice == 0;
                             cuimoji_state_save();
                         }
                         double sz = (double)emoji_size;

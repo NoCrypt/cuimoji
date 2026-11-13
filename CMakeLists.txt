@@ -1,17 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(cuimoji C)
 
-include(FetchContent)
-# CUI v1.2.0 with a small performance patch: draw more emoji per frame and
-# keep the bigger texture, so the grid is complete on the first frame.
-FetchContent_Declare(cui
-    GIT_REPOSITORY https://github.com/yappologistic/CUI.git
-    GIT_TAG v1.2.0
-    GIT_SHALLOW TRUE
-    PATCH_COMMAND sh -c "patch -p1 -N -r - -i ${CMAKE_CURRENT_SOURCE_DIR}/patches/cui-fast-emoji.patch || true")
+# CUI is vendored under third_party/cui (v1.2.0 plus cuimoji's changes), so a
+# build needs no network access and the picker can be tuned in-tree.
+set(CUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cui)
 set(CUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(CUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(cui)
+add_subdirectory(${CUI_DIR} EXCLUDE_FROM_ALL)
 
 find_package(X11 REQUIRED)
 find_package(SDL2 QUIET)
@@ -85,7 +80,7 @@ else()
 endif()
 
 add_executable(cuimoji ${CUIMOJI_SOURCES})
-target_include_directories(cuimoji PRIVATE ${cui_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(cuimoji PRIVATE ${CUI_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
                                            ${CMAKE_CURRENT_SOURCE_DIR}/vulkan ${CUIMOJI_INCLUDE_DIRS})
 target_link_libraries(cuimoji PRIVATE ${CUIMOJI_LIBS} ${CMAKE_DL_LIBS})
 # Release builds are stripped by default (~2.8 MB -> ~950 KB).

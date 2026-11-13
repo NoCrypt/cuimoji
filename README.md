@@ -27,11 +27,13 @@ Wayland. See [BENCHMARK.md](BENCHMARK.md) for the measured comparison.
 ## What you get
 
 - **Search that understands you** — search by name, tags, or shortcodes
-  (“rofl” finds 🤣). Exact names and shortcodes rank above tags, and
-  single-word typos are tolerated.
+  (“rofl” finds 🤣). Exact names and shortcodes rank above prefixes and tags,
+  emoji you pick often get a boost, and single-word typos are tolerated.
 - **Recents and groups** — your most-used emoji are always first; the nine
   groups (smileys, people, animals, food, places, activities, objects, symbols,
-  flags) have simple icons.
+  flags) have simple icons. `PageUp`/`PageDown` or `Ctrl+←`/`Ctrl+→` change
+  group; `←`/`→` stay in the current group and `↑`/`↓` travel through the
+  groups. `Backspace` returns to the search bar from anywhere in the picker.
 - **Skin tones** — pick a tone once and the people/hand emoji follow it,
   including with Apple Color Emoji.
 - **Your own fonts** — use the system emoji font, Apple Color Emoji, or drop a
@@ -79,12 +81,12 @@ upgrade or remove it.
 
 The [releases page](https://github.com/NoCrypt/cuimoji/releases) also has:
 
-- **AppImage** — `chmod +x cuimoji-0.6-linux-x86_64.AppImage` and run it. It
+- **AppImage** — `chmod +x cuimoji-0.7-linux-x86_64.AppImage` and run it. It
   needs FUSE 2, or run it with `--appimage-extract-and-run`.
-- **Flatpak** — `flatpak install --user cuimoji-0.6-x86_64.flatpak`. This uses
+- **Flatpak** — `flatpak install --user cuimoji-0.7-x86_64.flatpak`. This uses
   the `org.freedesktop.Platform` 25.08 runtime; custom emoji fonts go in
   `~/.local/share/cuimoji/emoji/`.
-- **Arch Linux** — `sudo pacman -U cuimoji-0.6-1-x86_64.pkg.tar.zst`.
+- **Arch Linux** — `sudo pacman -U cuimoji-0.7-1-x86_64.pkg.tar.zst`.
 - **Tarball** — the plain binary, font, icon and installer.
 
 All release builds are for x86_64 Linux.
@@ -113,14 +115,19 @@ possible, cuimoji falls back to `ydotool` when it is installed.
 | Key | What it does |
 |---|---|
 | Type | Start searching |
-| ↑ / ↓ / ← / → | Move around the grid |
+| ↑ / ↓ | Move by row, through the groups |
+| ← / → | Move within the current group |
+| Page Up / Page Down | Previous / next group |
+| Ctrl+← / Ctrl+→ | Previous / next group |
+| Backspace | Return to the search bar and delete |
 | Enter | Pick the selected emoji |
 | Esc | Close without picking |
 | F1 | Open settings |
 | F2 | Switch to the next emoji set |
 
-Or just click an emoji. The bar at the bottom shows the name of the emoji under
-the pointer and has the settings gear on the right.
+Or just click an emoji. The bar at the bottom shows the name of the emoji
+under the pointer, or of the keyboard-focused emoji while the grid has its blue
+focus ring; otherwise it shows the version. The settings gear is on the right.
 
 ### Settings
 
@@ -135,6 +142,8 @@ the pointer and has the settings gear on the right.
   clipboard keeps working after cuimoji exits via `wl-copy`; on a native X11
   session the selection belongs to the process, so it lasts only as long as the
   CUI X11 window's clipboard handling (use the normal paste mode there).
+- **Close on focus loss** — set to **On** to close the picker when another
+  window takes keyboard focus.
 - **Emoji size** — 24–128 px.
 - **UI size** — 90–150%. This zooms the whole interface, including text,
   controls, and emoji.
@@ -218,13 +227,13 @@ in `$XDG_STATE_HOME/cuimoji/state`.
 ## For developers
 
 cuimoji is written in C on top of [CUI](https://github.com/yappologistic/CUI).
-CMake fetches CUI v1.2.0 and applies
-[`patches/cui-fast-emoji.patch`](patches/cui-fast-emoji.patch), which makes the
-grid fill on the first frame, adds substring search, and teaches CUI Apple Color
-Emoji’s skin-tone glyph names. The native Wayland window uses SDL2; the X11
-window uses CUI’s own window. `CUIMOJI_DEBUG=1` prints paste timings; on the
-X11 window, `CUIMOJI_GL=1` forces OpenGL. Sway focus detection also needs
-`jq`.
+CUI v1.2.0 is vendored under [`third_party/cui`](third_party/cui), with
+cuimoji’s changes applied directly: the grid fills on the first frame,
+substring search, Apple Color Emoji’s skin-tone glyph names, the group
+shortcuts, and frequency-ranked search. The native Wayland window uses SDL2;
+the X11 window uses CUI’s own window. `CUIMOJI_DEBUG=1` prints paste timings;
+on the X11 window, `CUIMOJI_GL=1` forces OpenGL. Sway focus detection also
+needs `jq`.
 
 ## Changelog
 

@@ -4,14 +4,33 @@ All notable changes to cuimoji are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions use
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.7] - 2026-11-13
+
+### Added
+- `PageUp`/`PageDown` and `Ctrl+←`/`Ctrl+→` switch groups and put the cursor
+  on the group's first emoji, even while the search field has focus.
+- Search ranks emoji you pick often above other matches.
+- A **Close on focus loss** setting closes the picker when another window takes
+  keyboard focus.
 
 ### Changed
+- CUI is vendored under `third_party/cui` instead of being downloaded and
+  patched at configure time; the build needs no network access.
+- Left/right arrows stay inside the current group; up/down travel through the
+  groups. Arrows no longer jump back to the search field.
+- Pressing an arrow while the search field has focus moves the focus to the
+  grid, so the same arrows navigate the results.
+- Backspace anywhere in the picker moves the focus back to the search field
+  and deletes a character.
+- The bottom preview shows the keyboard-focused emoji only while the grid has
+  its blue focus ring (or the pointer is over an emoji); otherwise it returns
+  to the hint.
 - Lower memory use: the emoji atlas starts at 512² and only grows to 1024²
   when the viewport or emoji size needs the extra slots; the text atlas starts
   at 512²; the heap is trimmed once after startup.
 
 ### Fixed
+- The group tab row now shows a focus ring when it has keyboard focus.
 - The tone-selector hand no longer disappears at the lowest UI size.
 
 ## [0.6] - 2026-11-12
@@ -103,6 +122,7 @@ All notable changes to cuimoji are recorded here. The format follows
 - Fast auto-paste through `/dev/uinput`, with no daemon or portal.
 - Settings and state persistence.
 
+[0.7]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.7
 [0.6]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.6
 [0.5]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.5
 [0.4]: https://github.com/NoCrypt/cuimoji/releases/tag/v0.4
