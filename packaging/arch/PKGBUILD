@@ -13,7 +13,7 @@ optdepends=('niri: focused-window detection for auto-paste'
             'jq: needed for Sway focus detection'
             'ydotool: fallback auto-paste')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('a90632caff6db6275fdf56eb8db6880ffe1d043c837de56fcba2d65ee17ea724')
+sha256sums=('83a20797819097fda13c4720ce5682c4c1239c826158eec66b0b5bc198698f2d')
 
 build() {
     cmake -S "$pkgname-$pkgver" -B build -DCMAKE_BUILD_TYPE=Release
