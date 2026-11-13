@@ -166,3 +166,46 @@ jobs:
             gh release create "$VERSION" dist/* \
               --title "cuimoji ${version}" --notes-file release-notes.md
           fi
+
+  # The release artifacts are built from local inputs, but the committed
+  # packaging files point at the published assets. Refresh their checksums
+  # after a successful publish so a manual `makepkg` / `flatpak-builder` from
+  # main works without a follow-up commit.
+  package-sources:
+    name: Update package sources
+    runs-on: ubuntu-latest
+    needs: [linux, publish]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: dist
+      - name: Update checksums
+        run: |
+          version="${VERSION#v}"
+          tar="dist/cuimoji-${version}-linux-x86_64.tar.gz"
+          flatpak_sha=$(sha256sum "$tar" | cut -d' ' -f1)
+          tag_sha=$(curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${VERSION}.tar.gz" | sha256sum | cut -d' ' -f1)
+
+          sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${tag_sha}')/" packaging/arch/PKGBUILD
+
+          sed -i "s|releases/download/v[0-9][0-9.]*/cuimoji-[0-9][0-9.]*-linux-x86_64.tar.gz|releases/download/${VERSION}/cuimoji-${version}-linux-x86_64.tar.gz|" packaging/flatpak/io.github.NoCrypt.cuimoji.json
+          sed -i "s|\"sha256\": \"[0-9a-f]*\"|\"sha256\": \"${flatpak_sha}\"|" packaging/flatpak/io.github.NoCrypt.cuimoji.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packaging/arch/PKGBUILD packaging/flatpak/io.github.NoCrypt.cuimoji.json
+          if git diff --cached --quiet; then
+            echo "Package sources already up to date."
+            exit 0
+          fi
+          git commit -m "Update ${version} package sources [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
