@@ -235,6 +235,15 @@ the X11 window uses CUI’s own window. `CUIMOJI_DEBUG=1` prints paste timings;
 on the X11 window, `CUIMOJI_GL=1` forces OpenGL. Sway focus detection also
 needs `jq`.
 
+To bump the version strings and promote the changelog section:
+
+```sh
+tools/bump_version.py 0.8 --dry-run   # preview
+tools/bump_version.py 0.8
+```
+
+The release workflow refreshes the package checksums after publishing.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
